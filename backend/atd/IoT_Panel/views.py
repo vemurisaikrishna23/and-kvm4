@@ -94,9 +94,11 @@ class GetDispenserUnits(APIView):
         roles = get_user_roles(user_id)
         print(roles)
 
-        if 'IOT Admin' in roles:
+        if "IOT Admin" in roles:
             dispenser_units = DispenserUnits.objects.all()
             serializer = GetDispenserUnitsSerializer(dispenser_units, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get dispenser units"}, status=status.HTTP_403_FORBIDDEN)
+
+
