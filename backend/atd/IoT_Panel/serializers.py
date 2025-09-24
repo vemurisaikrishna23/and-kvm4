@@ -37,13 +37,13 @@ class GetCustomersSerializer(serializers.ModelSerializer):
 
 
 class CreateDispenserUnitSerializer(serializers.ModelSerializer):
-    serial_number = serializers.CharField(max_length=100, required=True)
-    batch_number = serializers.CharField(max_length=100, required=True)
-    imei_number = serializers.CharField(max_length=100, required=True)
-    mac_address = serializers.CharField(max_length=100, required=True)
-    firmware_version = serializers.CharField(max_length=50, required=True)
-    hardware_version = serializers.CharField(max_length=50, required=True)
-    production_date = serializers.DateField(required=True)
+    serial_number = serializers.CharField(max_length=100, required=True,allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    batch_number = serializers.CharField(max_length=100, required=True,allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    imei_number = serializers.CharField(max_length=100, required=True,allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    mac_address = serializers.CharField(max_length=100, required=True,allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    firmware_version = serializers.CharField(max_length=50, required=True,allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    hardware_version = serializers.CharField(max_length=50, required=True,allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    production_date = serializers.DateField(required=True,allow_null=False, error_messages={"blank": "This value should not be empty"})
     class Meta:
         model = DispenserUnits
         fields = [
@@ -90,6 +90,14 @@ class GetDispenserUnitsSerializer(serializers.ModelSerializer):
 
 
 class EditDispenserUnitSerializer(serializers.ModelSerializer):
+    serial_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    batch_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    imei_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    mac_address = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    firmware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    hardware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    production_date = serializers.DateField(required=True,allow_null=False, error_messages={"blank": "This value should not be empty"})
+
     class Meta:
         model = DispenserUnits
         fields = '__all__'
@@ -157,6 +165,13 @@ class DeleteDispenserUnitSerializer(serializers.Serializer):
 
 
 class CreateGunUnitSerializer(serializers.ModelSerializer):
+    serial_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    mac_address = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    firmware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    hardware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    rfid_reader_type = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    batch_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    production_date = serializers.DateField(required=True,allow_null=False, error_messages={"blank": "This value should not be empty"})
     class Meta:
         model = GunUnits
         fields = '__all__'
@@ -188,3 +203,54 @@ class GetGunUnitsSerializer(serializers.ModelSerializer):
     class Meta:
         model = GunUnits
         fields = '__all__'
+
+
+class EditGunUnitSerializer(serializers.ModelSerializer):
+    serial_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    mac_address = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    firmware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    hardware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    rfid_reader_type = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    batch_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    production_date = serializers.DateField(required=True,allow_null=False, error_messages={"blank": "This value should not be empty"})
+
+    class Meta:
+        model = GunUnits
+        fields = '__all__'
+
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        serial_number = attrs.get('serial_number')
+        if serial_number is not None:
+            qs = GunUnits.objects.filter(serial_number=serial_number)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError("Serial number already exists.")
+        
+        mac_address = attrs.get('mac_address')
+        if mac_address is not None:
+            qs = GunUnits.objects.filter(mac_address=mac_address)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError("MAC address already exists.")
+        
+        return attrs
+
+    
+    def update(self, instance, validated_data):
+        user = self.context.get("user", None)
+        instance.serial_number = validated_data.get('serial_number', instance.serial_number)
+        instance.mac_address = validated_data.get('mac_address', instance.mac_address)
+        instance.firmware_version = validated_data.get('firmware_version', instance.firmware_version)
+        instance.hardware_version = validated_data.get('hardware_version', instance.hardware_version)
+        instance.rfid_reader_type = validated_data.get('rfid_reader_type', instance.rfid_reader_type)
+        instance.battery_capacity = validated_data.get('battery_capacity', instance.battery_capacity)
+        instance.backup_hours = validated_data.get('backup_hours', instance.backup_hours)
+        instance.remarks = validated_data.get('remarks', instance.remarks)
+        instance.updated_by = user.id
+        instance.updated_at = timezone.now()
+        instance.save()
+        return instance
+        

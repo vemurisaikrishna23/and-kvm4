@@ -14,4 +14,5 @@ urlpatterns = [
 
     path("gun-unit/add/", AddGunUnit.as_view(), name="add-gun-unit"),
     path("gun-unit/get/", GetGunUnits.as_view(), name="get-gun-units"),
+    path("gun-unit/edit/<int:id>/", EditGunUnit.as_view(), name="edit-gun-unit"),
 ]
