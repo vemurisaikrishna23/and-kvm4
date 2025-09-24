@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from passlib.hash import bcrypt
 from existing_tables.models import *
-from .models import DispenserUnits
+from .models import *
 from django.utils import timezone
 
 class LoginSerializer(serializers.ModelSerializer):
@@ -154,3 +154,33 @@ class DeleteDispenserUnitSerializer(serializers.Serializer):
         # stash instance for the view to use
         attrs['instance'] = instance
         return attrs
+
+
+class CreateGunUnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GunUnits
+        fields = '__all__'
+    
+    def validate(self, attrs):
+        if GunUnits.objects.filter(serial_number=attrs['serial_number']).exists():
+            raise serializers.ValidationError("Serial number already exists.")
+        if GunUnits.objects.filter(mac_address=attrs['mac_address']).exists():
+            raise serializers.ValidationError("MAC address already exists.")
+        return attrs
+    
+    def create(self, validated_data):
+        user = self.context.get("user", None)
+        return GunUnits.objects.create(
+            serial_number=validated_data.get('serial_number'),
+            batch_number=validated_data.get('batch_number'),
+            mac_address=validated_data.get('mac_address'),
+            firmware_version=validated_data.get('firmware_version'),
+            hardware_version=validated_data.get('hardware_version'),
+            rfid_reader_type=validated_data.get('rfid_reader_type'),
+            battery_capacity=validated_data.get('battery_capacity'),
+            backup_hours=validated_data.get('backup_hours'),
+            remarks=validated_data.get('remarks'),
+            created_by=user.id,
+            created_at=timezone.now()
+        )
+    

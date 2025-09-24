@@ -191,8 +191,8 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 2097152  # 2 MB in bytes
 
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3039",
-    "http://127.0.0.1:3039",
+    "http://localhost:3090",
+    "http://127.0.0.1:3090",
     "http://atd.myaccessio.com",
     "https://atd.myaccessio.com"
 ]

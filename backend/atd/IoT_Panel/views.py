@@ -58,7 +58,7 @@ class LoginView(APIView):
 
 
 
-#GetCustomers
+#Get Customers
 class GetCustomers(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -170,4 +170,23 @@ class DeleteDispenserUnit(APIView):
             return Response({"error": "You are not authorized to delete a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
+#Add Gun Unit
+class AddGunUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            serializer = CreateGunUnitSerializer(data=request.data, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Gun Unit Created Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
