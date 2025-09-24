@@ -76,3 +76,9 @@ class CreateDispenserUnitSerializer(serializers.ModelSerializer):
             created_by=user.id,
             created_at=timezone.now()
         )
+
+
+class GetDispenserUnitsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DispenserUnits
+        fields = '__all__'

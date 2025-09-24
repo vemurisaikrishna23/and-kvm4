@@ -6,4 +6,5 @@ urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
 
     path("dispenser-unit/add/", AddDispenserUnit.as_view(), name="add-dispenser-unit"),
+    path("dispenser-unit/get/", GetDispenserUnits.as_view(), name="get-dispenser-units"),
 ]

@@ -67,17 +67,36 @@ class AddDispenserUnit(APIView):
 
     def post(self, request, format=None):
         user = request.user
-        print(user)
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(f"User ID: {user_id}, Roles: {roles}")
 
-        serializer = CreateDispenserUnitSerializer(data=request.data, context={"user": user})
-        if serializer.is_valid(raise_exception=True):
-            try:
-                serializer.save()
-                return Response({
-                    "message": "Dispenser Unit Created Successfully",
-                }, status=status.HTTP_201_CREATED)
-            except serializers.ValidationError as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        if roles in "IOT Admin":
+            serializer = CreateDispenserUnitSerializer(data=request.data, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Dispenser Unit Created Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to add a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+
+#Get Dispenser Units
+class GetDispenserUnits(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+
+        if roles in 'IOT Admin':
+            dispenser_units = DispenserUnits.objects.all()
+            serializer = GetDispenserUnitsSerializer(dispenser_units, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get dispenser units"}, status=status.HTTP_403_FORBIDDEN)
