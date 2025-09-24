@@ -24,7 +24,7 @@ class DispenserUnits(models.Model):
         db_table = "dispenser_units"
 
 
-class GunUnit(models.Model):
+class GunUnits(models.Model):
     id = models.BigAutoField(primary_key=True)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     batch_number = models.CharField(max_length=100, blank=True, null=True)

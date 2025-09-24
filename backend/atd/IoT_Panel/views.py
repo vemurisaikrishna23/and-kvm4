@@ -16,6 +16,15 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+def get_user_roles(user_id):
+    return list(
+        ModelHasRoles.objects
+        .filter(model_type="user", model_id=user_id)
+        .select_related("role")
+        .values_list("role__name", flat=True)
+    )
+
+
 #Login
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -49,9 +58,26 @@ class LoginView(APIView):
 
 
 
-# Add Dispenser Unit
-# class AddDispenserUnit(APIView):
-#     renderer_classes = [IoT_PanelRenderer]
-#     permission_classes = [IsAuthenticated]
 
-#     def post(self, request, format=None):
+
+# Add Dispenser Unit
+class AddDispenserUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        print(user)
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(f"User ID: {user_id}, Roles: {roles}")
+
+        serializer = CreateDispenserUnitSerializer(data=request.data, context={"user": user})
+        if serializer.is_valid(raise_exception=True):
+            try:
+                serializer.save()
+                return Response({
+                    "message": "Dispenser Unit Created Successfully",
+                }, status=status.HTTP_201_CREATED)
+            except serializers.ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
