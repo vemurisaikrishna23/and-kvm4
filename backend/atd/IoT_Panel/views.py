@@ -303,3 +303,32 @@ class GetNodeUnits(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get node units"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Edit Node Unit
+class EditNodeUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request,id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+        if "IOT Admin" in roles:
+            try:
+                instance = NodeUnits.objects.get(id=id)
+            except NodeUnits.DoesNotExist:
+                return Response({'error': 'Node Unit with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = EditNodeUnitSerializer(instance, data=request.data,partial=True, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Node Unit Updated Successfully",
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit a node unit"}, status=status.HTTP_403_FORBIDDEN)
+            
