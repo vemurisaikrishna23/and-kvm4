@@ -70,7 +70,7 @@ class AddDispenserUnit(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        if roles in "IOT Admin":
+        if "IOT Admin" in roles:
             serializer = CreateDispenserUnitSerializer(data=request.data, context={"user": user})
             if serializer.is_valid(raise_exception=True):
                 try:
@@ -94,7 +94,7 @@ class GetDispenserUnits(APIView):
         roles = get_user_roles(user_id)
         print(roles)
 
-        if roles in 'IOT Admin':
+        if 'IOT Admin' in roles:
             dispenser_units = DispenserUnits.objects.all()
             serializer = GetDispenserUnitsSerializer(dispenser_units, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
