@@ -102,3 +102,29 @@ class GetDispenserUnits(APIView):
             return Response({"error": "You are not authorized to get dispenser units"}, status=status.HTTP_403_FORBIDDEN)
 
 
+class EditDispenserUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request,id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+
+        if "IOT Admin" in roles:
+            try:
+                instance = DispenserUnits.objects.get(id=id)
+            except DispenserUnits.DoesNotExist:
+                return Response({'error': 'DispenserUnit with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = EditDispenserUnitSerializer(instance, data=request.data,partial=True, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Dispenser Unit Updated Successfully",
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
