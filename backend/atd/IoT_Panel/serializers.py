@@ -309,3 +309,8 @@ class CreateNodeUnitSerializer(serializers.ModelSerializer):
             created_by=user.id,
             created_at=timezone.now()
         )
+
+class GetNodeUnitsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NodeUnits
+        fields = '__all__'

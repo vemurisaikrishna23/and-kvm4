@@ -286,3 +286,20 @@ class AddNodeUnit(APIView):
         else:
             return Response({"error": "You are not authorized to add a node unit"}, status=status.HTTP_403_FORBIDDEN)
 
+
+
+class GetNodeUnits(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+        if "IOT Admin" in roles:
+            node_units = NodeUnits.objects.all()
+            serializer = GetNodeUnitsSerializer(node_units, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get node units"}, status=status.HTTP_403_FORBIDDEN)
