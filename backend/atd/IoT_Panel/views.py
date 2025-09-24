@@ -48,8 +48,10 @@ class LoginView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+
 # Add Dispenser Unit
 # class AddDispenserUnit(APIView):
 #     renderer_classes = [IoT_PanelRenderer]
 #     permission_classes = [IsAuthenticated]
 
+#     def post(self, request, format=None):
