@@ -131,3 +131,21 @@ class EditDispenserUnitSerializer(serializers.ModelSerializer):
         instance.updated_at = timezone.now()
         instance.save()
         return instance
+
+
+class DeleteDispenserUnitSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        dispenser_id = attrs.get('id')
+        try:
+            instance = DispenserUnits.objects.get(pk=dispenser_id)
+        except DispenserUnits.DoesNotExist:
+            raise serializers.ValidationError("Dispenser unit not found.")
+
+        if instance.assigned_status is True:
+            raise serializers.ValidationError("This dispenser unit is assigned to the customer.")
+
+        # stash instance for the view to use
+        attrs['instance'] = instance
+        return attrs
