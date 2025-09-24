@@ -49,7 +49,6 @@ class LoginView(APIView):
 
 
 # Add Dispenser Unit
-
 # class AddDispenserUnit(APIView):
 #     renderer_classes = [IoT_PanelRenderer]
 #     permission_classes = [IsAuthenticated]
