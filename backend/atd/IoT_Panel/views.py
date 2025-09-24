@@ -58,6 +58,22 @@ class LoginView(APIView):
 
 
 
+#GetCustomers
+class GetCustomers(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+        if "IOT Admin" in roles:
+            customers = Customers.objects.all()
+            serializer = GetCustomersSerializer(customers, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get customers"}, status=status.HTTP_403_FORBIDDEN)
 
 
 # Add Dispenser Unit
@@ -152,3 +168,6 @@ class DeleteDispenserUnit(APIView):
             return Response({'message': 'Dispenser Unit Deleted Successfully'}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to delete a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+

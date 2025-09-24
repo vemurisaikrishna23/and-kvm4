@@ -30,6 +30,11 @@ class LoginSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class GetCustomersSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customers
+        fields = '__all__'
+
 
 class CreateDispenserUnitSerializer(serializers.ModelSerializer):
     serial_number = serializers.CharField(max_length=100, required=True)
