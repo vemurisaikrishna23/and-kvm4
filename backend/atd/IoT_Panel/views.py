@@ -7,6 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import *
 from existing_tables.models import *
+from .renderers import *
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -14,8 +15,8 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
-    #test 123
 
+#Login
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -46,4 +47,10 @@ class LoginView(APIView):
             **tokens
         }, status=status.HTTP_200_OK)
 
+
+# Add Dispenser Unit
+
+# class AddDispenserUnit(APIView):
+#     renderer_classes = [IoT_PanelRenderer]
+#     permission_classes = [IsAuthenticated]
 
