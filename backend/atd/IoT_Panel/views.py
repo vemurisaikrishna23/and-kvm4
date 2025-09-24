@@ -240,3 +240,24 @@ class EditGunUnit(APIView):
 
 
 #Delete Gun Unit
+class DeleteGunUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request,id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+        if "IOT Admin" in roles:
+            try:
+                instance = GunUnits.objects.get(id=id)
+            except GunUnits.DoesNotExist:
+                return Response({'error': 'Gun Unit with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = DeleteGunUnitSerializer(data={'id': id})
+            serializer.is_valid(raise_exception=True)
+            instance = serializer.validated_data['instance']
+            instance.delete()
+            return Response({'message': 'Gun Unit Deleted Successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to delete a gun unit"}, status=status.HTTP_403_FORBIDDEN)

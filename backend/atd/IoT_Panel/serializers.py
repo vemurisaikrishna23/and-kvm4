@@ -253,4 +253,20 @@ class EditGunUnitSerializer(serializers.ModelSerializer):
         instance.updated_at = timezone.now()
         instance.save()
         return instance
-        
+
+
+class DeleteGunUnitSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    
+    def validate(self, attrs):
+        gun_unit_id = attrs.get('id')
+        try:
+            instance = GunUnits.objects.get(pk=gun_unit_id)
+        except GunUnits.DoesNotExist:
+            raise serializers.ValidationError("Gun unit not found.")
+        if instance.assigned_status is True:
+            raise serializers.ValidationError("This Gun unit is assigned to the Dispenser Unit.")
+        attrs['instance'] = instance
+        return attrs
+    
+    
