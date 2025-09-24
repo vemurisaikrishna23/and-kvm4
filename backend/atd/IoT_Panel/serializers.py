@@ -372,3 +372,18 @@ class EditNodeUnitSerializer(serializers.ModelSerializer):
         instance.updated_at = timezone.now()
         instance.save()
         return instance
+
+
+class DeleteNodeUnitSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        node_unit_id = attrs.get('id')
+        try:
+            instance = NodeUnits.objects.get(pk=node_unit_id)
+        except NodeUnits.DoesNotExist:
+            raise serializers.ValidationError("Node unit not found.")
+        if instance.assigned_status is True:
+            raise serializers.ValidationError("This Node unit is assigned to the Customer Unit.")
+        attrs['instance'] = instance
+        return attrs

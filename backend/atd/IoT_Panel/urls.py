@@ -20,4 +20,5 @@ urlpatterns = [
     path("node-unit/add/", AddNodeUnit.as_view(), name="add-node-unit"),
     path("node-unit/get/", GetNodeUnits.as_view(), name="get-node-units"),
     path("node-unit/edit/<int:id>/", EditNodeUnit.as_view(), name="edit-node-unit"),
+    path("node-unit/delete/<int:id>/", DeleteNodeUnit.as_view(), name="delete-node-unit"),
 ]
