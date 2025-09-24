@@ -14,6 +14,7 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+    #test
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
