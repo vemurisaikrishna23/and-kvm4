@@ -261,3 +261,28 @@ class DeleteGunUnit(APIView):
             return Response({'message': 'Gun Unit Deleted Successfully'}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to delete a gun unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+class AddNodeUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            serializer = CreateNodeUnitSerializer(data=request.data, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Node Unit Created Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to add a node unit"}, status=status.HTTP_403_FORBIDDEN)
+

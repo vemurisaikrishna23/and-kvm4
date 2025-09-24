@@ -189,6 +189,7 @@ class CreateGunUnitSerializer(serializers.ModelSerializer):
             serial_number=validated_data.get('serial_number'),
             batch_number=validated_data.get('batch_number'),
             mac_address=validated_data.get('mac_address'),
+            production_date=validated_data.get('production_date'),
             firmware_version=validated_data.get('firmware_version'),
             hardware_version=validated_data.get('hardware_version'),
             rfid_reader_type=validated_data.get('rfid_reader_type'),
@@ -246,6 +247,7 @@ class EditGunUnitSerializer(serializers.ModelSerializer):
         instance.firmware_version = validated_data.get('firmware_version', instance.firmware_version)
         instance.hardware_version = validated_data.get('hardware_version', instance.hardware_version)
         instance.rfid_reader_type = validated_data.get('rfid_reader_type', instance.rfid_reader_type)
+        instance.production_date = validated_data.get('production_date', instance.production_date)
         instance.battery_capacity = validated_data.get('battery_capacity', instance.battery_capacity)
         instance.backup_hours = validated_data.get('backup_hours', instance.backup_hours)
         instance.remarks = validated_data.get('remarks', instance.remarks)
@@ -270,3 +272,40 @@ class DeleteGunUnitSerializer(serializers.Serializer):
         return attrs
     
     
+class CreateNodeUnitSerializer(serializers.ModelSerializer):
+    serial_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    imei_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    mac_address = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    firmware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    hardware_version = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    batch_number = serializers.CharField(required=True, allow_blank=False, error_messages={"blank": "This value should not be empty"})
+    production_date = serializers.DateField(required=True,allow_null=False, error_messages={"blank": "This value should not be empty"})
+    class Meta:
+        model = NodeUnits
+        fields = '__all__'
+    
+    def validate(self, attrs):
+        if NodeUnits.objects.filter(serial_number=attrs['serial_number']).exists():
+            raise serializers.ValidationError("Serial number already exists.")
+        if NodeUnits.objects.filter(imei_number=attrs['imei_number']).exists():
+            raise serializers.ValidationError("IMEI number already exists.")
+        if NodeUnits.objects.filter(mac_address=attrs['mac_address']).exists():
+            raise serializers.ValidationError("MAC address already exists.")
+        return attrs
+    
+    def create(self, validated_data):
+        user = self.context.get("user", None)
+        return NodeUnits.objects.create(
+            serial_number=validated_data.get('serial_number'),
+            imei_number=validated_data.get('imei_number'),
+            batch_number=validated_data.get('batch_number'),
+            mac_address=validated_data.get('mac_address'),
+            firmware_version=validated_data.get('firmware_version'),
+            production_date=validated_data.get('production_date'),
+            hardware_version=validated_data.get('hardware_version'),
+            battery_capacity=validated_data.get('battery_capacity'),
+            backup_hours=validated_data.get('backup_hours'),
+            remarks=validated_data.get('remarks'),
+            created_by=user.id,
+            created_at=timezone.now()
+        )
