@@ -190,3 +190,22 @@ class AddGunUnit(APIView):
                     }, status=status.HTTP_201_CREATED)
                 except serializers.ValidationError as e:
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+#Get Gun Units
+class GetGunUnits(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
+
+        if "IOT Admin" in roles:
+            gun_units = GunUnits.objects.all()
+            serializer = GetGunUnitsSerializer(gun_units, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get gun units"}, status=status.HTTP_403_FORBIDDEN)

@@ -184,3 +184,7 @@ class CreateGunUnitSerializer(serializers.ModelSerializer):
             created_at=timezone.now()
         )
     
+class GetGunUnitsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GunUnits
+        fields = '__all__'
