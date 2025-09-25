@@ -67,7 +67,6 @@ class GetCustomers(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             customers = Customers.objects.all()
             serializer = GetCustomersSerializer(customers, many=True)
@@ -108,7 +107,6 @@ class GetDispenserUnits(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
 
         if "IOT Admin" in roles:
             dispenser_units = DispenserUnits.objects.all()
@@ -126,7 +124,6 @@ class EditDispenserUnit(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
 
         if "IOT Admin" in roles:
             try:
@@ -155,7 +152,6 @@ class DeleteDispenserUnit(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             try:
                 instance = DispenserUnits.objects.get(id=id)
@@ -201,7 +197,6 @@ class GetGunUnits(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
 
         if "IOT Admin" in roles:
             gun_units = GunUnits.objects.all()
@@ -220,7 +215,6 @@ class EditGunUnit(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             try:
                 instance = GunUnits.objects.get(id=id)
@@ -248,7 +242,6 @@ class DeleteGunUnit(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             try:
                 instance = GunUnits.objects.get(id=id)
@@ -296,7 +289,6 @@ class GetNodeUnits(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             node_units = NodeUnits.objects.all()
             serializer = GetNodeUnitsSerializer(node_units, many=True)
@@ -314,7 +306,6 @@ class EditNodeUnit(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             try:
                 instance = NodeUnits.objects.get(id=id)
@@ -342,7 +333,6 @@ class DeleteNodeUnit(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(roles)
         if "IOT Admin" in roles:
             try:
                 instance = NodeUnits.objects.get(id=id)

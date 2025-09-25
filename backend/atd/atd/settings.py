@@ -161,7 +161,7 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
+   
 
 
 REST_FRAMEWORK = {
@@ -191,8 +191,8 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 2097152  # 2 MB in bytes
 
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3090",
-    "http://127.0.0.1:3090",
+    "http://localhost:3090/",
+    "http://127.0.0.1:3090/",
     "http://atd.myaccessio.com",
     "https://atd.myaccessio.com"
 ]
