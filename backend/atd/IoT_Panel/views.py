@@ -345,3 +345,46 @@ class DeleteNodeUnit(APIView):
             return Response({'message': 'Node Unit Deleted Successfully'}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to delete a node unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+class AddDispenserGunMappingToCustomer(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            serializer = CreateDispenserGunMappingToCustomerSerializer(data=request.data, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Dispenser & Gun Unit Mapping to Customer Created Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to add a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Dispenser Gun Mapping to Customer
+class GetDispenserGunMappingToCustomer(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.all()
+            serializer = GetDispenserGunMappingToCustomerSerializer(dispenser_gun_mapping_to_customer, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Edit Dispenser Gun Mapping to Customer
