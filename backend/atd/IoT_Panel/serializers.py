@@ -698,3 +698,19 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomerSerializer(seria
         return instance
 
 
+class DeleteDispenserGunMappingToCustomerSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    
+    def validate(self, attrs):
+        instance = self.context.get('instance')  # Changed from getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+        
+        # Check if assigned_status is True
+        if instance.assigned_status is True:
+            raise serializers.ValidationError("Cannot delete dispenser gun mapping that is currently assigned to a customer.")
+        return attrs
+    
+    def delete(self, instance):
+        instance.delete()
+        return instance

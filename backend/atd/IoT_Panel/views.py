@@ -433,8 +433,6 @@ class EditDispenserGunMappingToCustomer(APIView):
         else:
             return Response({"error": "You are not authorized to edit a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
-
-#Edit Status and Assigned Status of Dispenser Gun Mapping to Customer
 class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -453,11 +451,46 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer(APIView):
             serializer = EditStatusAndAssignedStatusOfDispenserGunMappingToCustomerSerializer(instance, data=request.data, partial=True, context={"user": user})
             if serializer.is_valid(raise_exception=True):
                 try:
-                    serializer.save()
-                    return Response({
-                        "message": "Status of Dispenser Gun Mapping to Customer Updated Successfully",
-                    }, status=status.HTTP_200_OK)
+                    serializer.save()                    
+                    if 'status' in request.data:
+                        return Response({
+                            "message": "Status field updated successfully",
+                        }, status=status.HTTP_200_OK)
+                    elif 'assigned_status' in request.data:
+                        return Response({
+                            "message": "Assigned status updated successfully",
+                        }, status=status.HTTP_200_OK)
+                    else:
+                        return Response({
+                            "message": "Dispenser Gun Mapping updated successfully",
+                        }, status=status.HTTP_200_OK)
+                        
                 except serializers.ValidationError as e:
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to edit the status of a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
+#Delete Dispenser Gun Mapping to Customer
+class DeleteDispenserGunMappingToCustomer(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            try:
+                instance = Dispenser_Gun_Mapping_To_Customer.objects.get(id=id)
+            except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+                return Response({'error': 'Dispenser Gun Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = DeleteDispenserGunMappingToCustomerSerializer(data={'id': id}, context={'instance': instance})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.delete(instance)
+                    return Response({'message': 'Dispenser Gun Mapping to Customer Deleted Successfully'}, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to delete a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)

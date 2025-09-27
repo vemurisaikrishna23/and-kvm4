@@ -27,4 +27,5 @@ urlpatterns = [
     path("dispenser-gun-mapping-to-customer/get/<int:customer_id>/", GetDispenserGunMappingToCustomerByCustomerID.as_view(), name="get-dispenser-gun-mapping-to-customer-by-customer-id"),
     path("dispenser-gun-mapping-to-customer/edit/<int:id>/", EditDispenserGunMappingToCustomer.as_view(), name="edit-dispenser-gun-mapping-to-customer"),
     path("dispenser-gun-mapping-to-customer/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-customer"),
+    path("dispenser-gun-mapping-to-customer/delete/<int:id>/", DeleteDispenserGunMappingToCustomer.as_view(), name="delete-dispenser-gun-mapping-to-customer"),
 ]
