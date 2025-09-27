@@ -778,6 +778,10 @@ class AssignNodeUnitAndDispenserGunMappingToCustomerSerializer(serializers.Model
         if NodeUnits.objects.select_for_update().get(pk=node_unit.pk).assigned_status:
             raise serializers.ValidationError("This node unit is already assigned and cannot be allotted.")
         
+        # Double-check dispenser unit is not assigned to another node unit (if provided)
+        if NodeDispenserCustomerMapping.objects.select_for_update().filter(dispenser_unit=dispenser_unit).exists():
+            raise serializers.ValidationError("This dispenser unit is already assigned to another node unit.")
+
         instance = NodeDispenserCustomerMapping.objects.create(
             node_unit=node_unit,
             dispenser_unit=dispenser_unit,
@@ -866,6 +870,13 @@ class EditNodeDispenserCustomerMappingSerializer(serializers.ModelSerializer):
                 if not existing_mapping:
                     raise serializers.ValidationError("This dispenser unit is not assigned to this customer.")
             
+                existing_node_mapping = NodeDispenserCustomerMapping.objects.filter(
+                    dispenser_unit=new_dispenser_unit
+                ).exclude(id=instance.id).exists()
+                
+                if existing_node_mapping:
+                    raise serializers.ValidationError("This dispenser unit is already assigned to another node unit.")
+            
             # Store for later processing
             attrs['_new_dispenser_unit'] = new_dispenser_unit
             attrs['_previous_dispenser_unit'] = previous_data['dispenser_unit']
@@ -915,7 +926,6 @@ class EditNodeDispenserCustomerMappingSerializer(serializers.ModelSerializer):
         # Handle dispenser_unit change
         if '_new_dispenser_unit' in validated_data:
             new_dispenser_unit = validated_data['_new_dispenser_unit']
-            previous_dispenser_unit = validated_data['_previous_dispenser_unit']
             # Update the instance
             instance.dispenser_unit = new_dispenser_unit
         else:
