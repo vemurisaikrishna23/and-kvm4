@@ -100,5 +100,5 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
         verbose_name_plural = "Dispenser-Gun Mappings"
 
     def __str__(self):
-        return f"Map: Cust-{self.customer}, Disp-{self.dispenser_unit_id}, Gun-{self.gun_unit_id}"
+        return f"Map {self.id}: Cust-{self.customer}, Disp-{self.dispenser_unit_id}, Gun-{self.gun_unit_id}"
 

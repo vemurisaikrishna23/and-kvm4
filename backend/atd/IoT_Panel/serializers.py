@@ -487,3 +487,214 @@ class GetDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
         model = Dispenser_Gun_Mapping_To_Customer
         fields = '__all__'
         depth = 1
+
+
+class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
+    dispenser_unit = serializers.PrimaryKeyRelatedField(queryset=DispenserUnits.objects.all(), required=False)
+    gun_unit = serializers.PrimaryKeyRelatedField(queryset=GunUnits.objects.all(), required=False)
+    totalizer_reading = serializers.FloatField(required=False)
+    total_reading_amount = serializers.FloatField(required=False)
+    live_price = serializers.FloatField(required=False)
+    grade = serializers.IntegerField(required=False)
+    nozzle = serializers.IntegerField(required=False)
+    remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = Dispenser_Gun_Mapping_To_Customer
+        fields = [
+            'dispenser_unit',
+            'gun_unit',
+            'totalizer_reading',
+            'total_reading_amount',
+            'live_price',
+            'grade',
+            'nozzle',
+            'remarks',
+        ]
+
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+        
+        # Get previous data
+        previous_data = {
+            'dispenser_unit': instance.dispenser_unit,
+            'gun_unit': instance.gun_unit,
+            'totalizer_reading': instance.totalizer_reading,
+            'total_reading_amount': instance.total_reading_amount,
+            'live_price': instance.live_price,
+            'grade': instance.grade,
+            'nozzle': instance.nozzle,
+            'remarks': instance.remarks,
+        }
+
+        # Check if dispenser_unit is being changed
+        new_dispenser_unit = attrs.get('dispenser_unit')
+        if new_dispenser_unit and new_dispenser_unit != previous_data['dispenser_unit']:
+            # Validate new dispenser unit exists and is not assigned
+            if new_dispenser_unit.assigned_status is True:
+                raise serializers.ValidationError("This dispenser unit is already assigned and cannot be allotted.")
+            
+            # Store for later processing
+            attrs['_new_dispenser_unit'] = new_dispenser_unit
+            attrs['_previous_dispenser_unit'] = previous_data['dispenser_unit']
+
+        # Check if gun_unit is being changed
+        new_gun_unit = attrs.get('gun_unit')
+        if new_gun_unit and new_gun_unit != previous_data['gun_unit']:
+            # Validate new gun unit exists and is not assigned
+            if new_gun_unit.assigned_status is True:
+                raise serializers.ValidationError("This gun unit is already assigned and cannot be allotted.")
+            
+            # Store for later processing
+            attrs['_new_gun_unit'] = new_gun_unit
+            attrs['_previous_gun_unit'] = previous_data['gun_unit']
+
+        return attrs
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user = self.context.get("user", None)
+        
+        # Get previous data for comparison
+        previous_data = {
+            'dispenser_unit': instance.dispenser_unit,
+            'gun_unit': instance.gun_unit,
+            'totalizer_reading': instance.totalizer_reading,
+            'total_reading_amount': instance.total_reading_amount,
+            'live_price': instance.live_price,
+            'grade': instance.grade,
+            'nozzle': instance.nozzle,
+            'remarks': instance.remarks,
+        }
+
+        # Update fields only if they are provided in the payload
+        # If not provided, keep the previous data
+        instance.totalizer_reading = validated_data.get('totalizer_reading', previous_data['totalizer_reading'])
+        instance.total_reading_amount = validated_data.get('total_reading_amount', previous_data['total_reading_amount'])
+        instance.live_price = validated_data.get('live_price', previous_data['live_price'])
+        instance.grade = validated_data.get('grade', previous_data['grade'])
+        instance.nozzle = validated_data.get('nozzle', previous_data['nozzle'])
+        instance.remarks = validated_data.get('remarks', previous_data['remarks'])
+        
+        # Handle dispenser_unit change
+        if '_new_dispenser_unit' in validated_data:
+            new_dispenser_unit = validated_data['_new_dispenser_unit']
+            previous_dispenser_unit = validated_data['_previous_dispenser_unit']
+            
+            # Update the instance
+            instance.dispenser_unit = new_dispenser_unit
+            
+            # Mark new dispenser unit as assigned
+            new_dispenser_unit.assigned_status = True
+            new_dispenser_unit.updated_by = (user.id if user else new_dispenser_unit.updated_by)
+            new_dispenser_unit.updated_at = timezone.now()
+            new_dispenser_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+            
+            # Mark previous dispenser unit as unassigned
+            previous_dispenser_unit.assigned_status = False
+            previous_dispenser_unit.updated_by = (user.id if user else previous_dispenser_unit.updated_by)
+            previous_dispenser_unit.updated_at = timezone.now()
+            previous_dispenser_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+        else:
+            # Keep the same dispenser unit
+            instance.dispenser_unit = previous_data['dispenser_unit']
+
+        # Handle gun_unit change
+        if '_new_gun_unit' in validated_data:
+            new_gun_unit = validated_data['_new_gun_unit']
+            previous_gun_unit = validated_data['_previous_gun_unit']
+            
+            # Update the instance
+            instance.gun_unit = new_gun_unit
+            
+            # Mark new gun unit as assigned
+            new_gun_unit.assigned_status = True
+            new_gun_unit.updated_by = (user.id if user else new_gun_unit.updated_by)
+            new_gun_unit.updated_at = timezone.now()
+            new_gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+            
+            # Mark previous gun unit as unassigned
+            previous_gun_unit.assigned_status = False
+            previous_gun_unit.updated_by = (user.id if user else previous_gun_unit.updated_by)
+            previous_gun_unit.updated_at = timezone.now()
+            previous_gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+        else:
+            # Keep the same gun unit
+            instance.gun_unit = previous_data['gun_unit']
+
+        # Update the mapping instance
+        instance.updated_by = (user.id if user else instance.updated_by)
+        instance.updated_at = timezone.now()
+        instance.save()
+
+        return instance
+
+
+
+class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
+    status = serializers.BooleanField(required=False)
+    assigned_status = serializers.BooleanField(required=False)
+    
+    class Meta:
+        model = Dispenser_Gun_Mapping_To_Customer
+        fields = ['status', 'assigned_status']
+        
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+        
+        # Check if both fields are provided
+        if 'status' in attrs and 'assigned_status' in attrs:
+            raise serializers.ValidationError("Only one field can be updated at a time: either 'status' or 'assigned_status'.")
+        
+        # Check if no fields are provided
+        if 'status' not in attrs and 'assigned_status' not in attrs:
+            raise serializers.ValidationError("Either 'status' or 'assigned_status' must be provided.")
+            
+        return attrs
+        
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user = self.context.get("user", None)
+        
+        # Update status field only
+        if 'status' in validated_data:
+            instance.status = validated_data['status']
+            instance.updated_by = (user.id if user else instance.updated_by)
+            instance.updated_at = timezone.now()
+            instance.save()
+            
+        # Update assigned_status field and related unit statuses
+        elif 'assigned_status' in validated_data:
+            new_assigned_status = validated_data['assigned_status']
+            instance.assigned_status = new_assigned_status
+            
+            # If assigned_status is being disabled, also disable the status field
+            if not new_assigned_status:
+                instance.status = False
+            
+            # Update dispenser unit assigned_status
+            dispenser_unit = instance.dispenser_unit
+            dispenser_unit.assigned_status = new_assigned_status
+            dispenser_unit.updated_by = (user.id if user else dispenser_unit.updated_by)
+            dispenser_unit.updated_at = timezone.now()
+            dispenser_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+            
+            # Update gun unit assigned_status
+            gun_unit = instance.gun_unit
+            gun_unit.assigned_status = new_assigned_status
+            gun_unit.updated_by = (user.id if user else gun_unit.updated_by)
+            gun_unit.updated_at = timezone.now()
+            gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+            
+            # Update the mapping instance
+            instance.updated_by = (user.id if user else instance.updated_by)
+            instance.updated_at = timezone.now()
+            instance.save()
+        
+        return instance
+
+
