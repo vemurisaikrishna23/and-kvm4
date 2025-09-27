@@ -494,3 +494,141 @@ class DeleteDispenserGunMappingToCustomer(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to delete a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Assign Node Unit & Dispenser Gun Mapping to Customer
+class AssignNodeUnitAndDispenserGunMappingToCustomer(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            serializer = AssignNodeUnitAndDispenserGunMappingToCustomerSerializer(data=request.data, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Node Unit & Dispenser Gun Mapping to Customer Assigned Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to assign a node unit and dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Node Dispenser Customer Mapping
+class GetNodeDispenserCustomerMapping(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            node_dispenser_customer_mapping = NodeDispenserCustomerMapping.objects.all()
+            serializer = GetNodeDispenserCustomerMappingSerializer(node_dispenser_customer_mapping, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Node Dispenser Customer Mapping by Customer ID
+class GetNodeDispenserCustomerMappingByCustomerID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            node_dispenser_customer_mapping = NodeDispenserCustomerMapping.objects.filter(customer=customer_id)
+            serializer = GetNodeDispenserCustomerMappingSerializer(node_dispenser_customer_mapping, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Edit Node Dispenser Customer Mapping
+class EditNodeDispenserCustomerMapping(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            try:
+                instance = NodeDispenserCustomerMapping.objects.get(id=id)
+            except NodeDispenserCustomerMapping.DoesNotExist:
+                return Response({'error': 'Node Dispenser Customer Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = EditNodeDispenserCustomerMappingSerializer(instance, data=request.data, partial=True, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Node Dispenser Customer Mapping Updated Successfully",
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Edit Status and Assigned Status of Node Dispenser Customer Mapping
+class EditStatusAndAssignedStatusOfNodeDispenserCustomerMapping(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        if "IOT Admin" in roles:
+            try:
+                instance = NodeDispenserCustomerMapping.objects.get(id=id)
+            except NodeDispenserCustomerMapping.DoesNotExist:
+                return Response({'error': 'Node Dispenser Customer Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = EditStatusAndAssignedStatusOfNodeDispenserCustomerMappingSerializer(instance, data=request.data, partial=True, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Node Dispenser Customer Mapping Updated Successfully",
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit the status and assigned status of a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Delete Node Dispenser Customer Mapping
+class DeleteNodeDispenserCustomerMapping(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            try:
+                instance = NodeDispenserCustomerMapping.objects.get(id=id)
+            except NodeDispenserCustomerMapping.DoesNotExist:
+                return Response({'error': 'Node Dispenser Customer Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = DeleteNodeDispenserCustomerMappingSerializer(data={'id': id}, context={'instance': instance})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.delete(instance)
+                    return Response({'message': 'Node Dispenser Customer Mapping Deleted Successfully'}, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to delete a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)

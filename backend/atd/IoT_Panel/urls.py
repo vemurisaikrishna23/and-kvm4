@@ -28,4 +28,12 @@ urlpatterns = [
     path("dispenser-gun-mapping-to-customer/edit/<int:id>/", EditDispenserGunMappingToCustomer.as_view(), name="edit-dispenser-gun-mapping-to-customer"),
     path("dispenser-gun-mapping-to-customer/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-customer"),
     path("dispenser-gun-mapping-to-customer/delete/<int:id>/", DeleteDispenserGunMappingToCustomer.as_view(), name="delete-dispenser-gun-mapping-to-customer"),
+
+    path("node-dispenser-customer-mapping/add/", AssignNodeUnitAndDispenserGunMappingToCustomer.as_view(), name="assign-node-unit-and-dispenser-gun-mapping-to-customer"),
+    path("node-dispenser-customer-mapping/get/", GetNodeDispenserCustomerMapping.as_view(), name="get-node-dispenser-customer-mapping"),
+    path("node-dispenser-customer-mapping/get/<int:customer_id>/", GetNodeDispenserCustomerMappingByCustomerID.as_view(), name="get-node-dispenser-customer-mapping-by-customer-id"),
+    path("node-dispenser-customer-mapping/edit/<int:id>/", EditNodeDispenserCustomerMapping.as_view(), name="edit-node-dispenser-customer-mapping"),
+    path("node-dispenser-customer-mapping/edit-status/<int:id>/", EditStatusAndAssignedStatusOfNodeDispenserCustomerMapping.as_view(), name="edit-status-and-assigned-status-of-node-dispenser-customer-mapping"),
+    path("node-dispenser-customer-mapping/delete/<int:id>/", DeleteNodeDispenserCustomerMapping.as_view(), name="delete-node-dispenser-customer-mapping"),
 ]
+

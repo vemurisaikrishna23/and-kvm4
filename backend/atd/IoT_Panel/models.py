@@ -102,3 +102,28 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
     def __str__(self):
         return f"Map {self.id}: Cust-{self.customer}, Disp-{self.dispenser_unit_id}, Gun-{self.gun_unit_id}"
 
+
+class NodeDispenserCustomerMapping(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    node_unit = models.ForeignKey(NodeUnits,on_delete=models.CASCADE,related_name="node_mappings",help_text="Node Unit being assigned")
+    dispenser_unit = models.ForeignKey(DispenserUnits,on_delete=models.SET_NULL,null=True,blank=True,related_name="dispenser_mappings",help_text="Dispenser Unit (optional) being assigned")
+    customer = models.BigIntegerField(help_text="Customer ID to whom both units are assigned")
+    fuel_sensor_type = models.IntegerField(help_text="Fuel sensor type, e.g., 0 - ultrasonic, 1 - float, 2 - capacitive")
+    assigned_status = models.BooleanField(default=True, help_text="Whether this unit is currently with customer or not")
+    status = models.BooleanField(default=True, help_text="to stop controls to the customer")
+    gps_coordinates = models.JSONField(blank=True, null=True, help_text="Live GPS coordinates as JSON: {'lat': ..., 'lon': ...}")
+    remarks = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    updated_by = models.PositiveBigIntegerField(blank=True, null=True)
+    
+    class Meta:
+        db_table = "node_dispenser_customer_mapping"
+        verbose_name = "Node-Dispenser Mapping to Customer"
+        verbose_name_plural = "Node-Dispenser Mappings"
+    def __str__(self):
+        return f"Map {self.id}: Cust-{self.customer}, Node-{self.node_unit_id}, Disp-{self.dispenser_unit_id or 'None'}"
+
+
+

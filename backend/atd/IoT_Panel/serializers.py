@@ -714,3 +714,283 @@ class DeleteDispenserGunMappingToCustomerSerializer(serializers.Serializer):
     def delete(self, instance):
         instance.delete()
         return instance
+
+
+class AssignNodeUnitAndDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
+    node_unit = serializers.PrimaryKeyRelatedField(queryset=NodeUnits.objects.all(), required=True)
+    dispenser_unit = serializers.PrimaryKeyRelatedField(queryset=DispenserUnits.objects.all(), required=False, allow_null=True)
+    customer = serializers.IntegerField(required=True)
+    fuel_sensor_type = serializers.IntegerField(required=True)
+    remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    
+    class Meta:
+        model = NodeDispenserCustomerMapping
+        fields = ['node_unit', 'dispenser_unit', 'customer', 'fuel_sensor_type', 'remarks']
+    
+    def validate_customer(self, value):
+        if not Customers.objects.filter(pk=value).exists():
+            raise serializers.ValidationError("Customer does not exist.")
+        return value
+    
+    def validate_node_unit(self, value):
+        if value.assigned_status is True:
+            raise serializers.ValidationError("This node unit is already assigned and cannot be allotted.")
+        return value
+    
+    def validate_dispenser_unit(self, value):
+        if value and value.assigned_status is False:
+            raise serializers.ValidationError("This dispenser unit is not assigned to any customer.")
+        return value
+    
+    def validate(self, attrs):
+        node_unit = attrs.get('node_unit')
+        dispenser_unit = attrs.get('dispenser_unit')
+        customer = attrs.get('customer')
+        
+        # Check if node unit is already assigned to any customer
+        if NodeDispenserCustomerMapping.objects.filter(node_unit=node_unit).exists():
+            raise serializers.ValidationError("Node unit already assigned to a customer.")
+        
+        # If dispenser_unit is provided, check if it's assigned to the same customer
+        if dispenser_unit:
+            # Check if this dispenser unit is assigned to this specific customer
+            existing_mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                dispenser_unit=dispenser_unit,
+                customer=customer,
+                assigned_status=True
+            ).exists()
+            
+            if not existing_mapping:
+                raise serializers.ValidationError("This dispenser unit is not assigned to this customer.")
+        
+        return attrs
+        
+    @transaction.atomic
+    def create(self, validated_data):
+        user = self.context.get("user", None)
+        node_unit = validated_data['node_unit']
+        dispenser_unit = validated_data.get('dispenser_unit')
+        customer = validated_data['customer']
+        fuel_sensor_type = validated_data['fuel_sensor_type']
+        remarks = validated_data.get('remarks')
+        
+        # Double-check node unit is not assigned (race condition protection)
+        if NodeUnits.objects.select_for_update().get(pk=node_unit.pk).assigned_status:
+            raise serializers.ValidationError("This node unit is already assigned and cannot be allotted.")
+        
+        instance = NodeDispenserCustomerMapping.objects.create(
+            node_unit=node_unit,
+            dispenser_unit=dispenser_unit,
+            customer=customer,
+            fuel_sensor_type=fuel_sensor_type,
+            remarks=remarks,
+            created_by=user.id,
+            created_at=timezone.now()
+        )
+        
+        # Mark node unit as assigned
+        node_unit.assigned_status = True
+        node_unit.updated_by = user.id
+        node_unit.updated_at = timezone.now()
+        node_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+        
+        return instance
+
+
+class GetNodeDispenserCustomerMappingSerializer(serializers.ModelSerializer):
+    node_unit = GetNodeUnitsSerializer()
+    dispenser_unit = GetDispenserUnitsSerializer()
+    class Meta:
+        model = NodeDispenserCustomerMapping
+        fields = '__all__'
+        depth = 1
+
+
+
+
+class EditNodeDispenserCustomerMappingSerializer(serializers.ModelSerializer):
+    node_unit = serializers.PrimaryKeyRelatedField(queryset=NodeUnits.objects.all(), required=False)
+    dispenser_unit = serializers.PrimaryKeyRelatedField(queryset=DispenserUnits.objects.all(), required=False, allow_null=True)
+    fuel_sensor_type = serializers.IntegerField(required=False)
+    remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = NodeDispenserCustomerMapping
+        fields = ['node_unit','dispenser_unit','fuel_sensor_type','remarks',]
+
+    def validate_node_unit(self, value):
+        if value and value.assigned_status is True:
+            raise serializers.ValidationError("This node unit is already assigned and cannot be allotted.")
+        return value
+
+    def validate_dispenser_unit(self, value):
+        if value and value.assigned_status is False:
+            raise serializers.ValidationError("This dispenser unit is not assigned to any customer.")
+        return value
+
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+        
+        # Get previous data
+        previous_data = {
+            'node_unit': instance.node_unit,
+            'dispenser_unit': instance.dispenser_unit,
+            'fuel_sensor_type': instance.fuel_sensor_type,
+            'remarks': instance.remarks,
+        }
+
+        # Check if node_unit is being changed
+        new_node_unit = attrs.get('node_unit')
+        if new_node_unit and new_node_unit != previous_data['node_unit']:
+            # Check if new node unit is already assigned to any customer
+            if NodeDispenserCustomerMapping.objects.filter(node_unit=new_node_unit).exclude(id=instance.id).exists():
+                raise serializers.ValidationError("This node unit is already assigned to another customer.")
+            
+            # Store for later processing
+            attrs['_new_node_unit'] = new_node_unit
+            attrs['_previous_node_unit'] = previous_data['node_unit']
+
+        # Check if dispenser_unit is being changed
+        new_dispenser_unit = attrs.get('dispenser_unit')
+        if new_dispenser_unit != previous_data['dispenser_unit']:  # This handles both None and actual changes
+            if new_dispenser_unit:
+                # Check if this dispenser unit is assigned to the same customer
+                existing_mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    dispenser_unit=new_dispenser_unit,
+                    customer=instance.customer,
+                    assigned_status=True
+                ).exists()
+                
+                if not existing_mapping:
+                    raise serializers.ValidationError("This dispenser unit is not assigned to this customer.")
+            
+            # Store for later processing
+            attrs['_new_dispenser_unit'] = new_dispenser_unit
+            attrs['_previous_dispenser_unit'] = previous_data['dispenser_unit']
+
+        return attrs
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user = self.context.get("user", None)
+        
+        # Get previous data for comparison
+        previous_data = {
+            'node_unit': instance.node_unit,
+            'dispenser_unit': instance.dispenser_unit,
+            'fuel_sensor_type': instance.fuel_sensor_type,
+            'remarks': instance.remarks,
+        }
+
+        # Update fields only if they are provided in the payload
+        # If not provided, keep the previous data
+        instance.fuel_sensor_type = validated_data.get('fuel_sensor_type', previous_data['fuel_sensor_type'])
+        instance.remarks = validated_data.get('remarks', previous_data['remarks'])
+        
+        # Handle node_unit change
+        if '_new_node_unit' in validated_data:
+            new_node_unit = validated_data['_new_node_unit']
+            previous_node_unit = validated_data['_previous_node_unit']
+            
+            # Update the instance
+            instance.node_unit = new_node_unit
+            
+            # Mark new node unit as assigned
+            new_node_unit.assigned_status = True
+            new_node_unit.updated_by = (user.id if user else new_node_unit.updated_by)
+            new_node_unit.updated_at = timezone.now()
+            new_node_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+            
+            # Mark previous node unit as unassigned
+            previous_node_unit.assigned_status = False
+            previous_node_unit.updated_by = (user.id if user else previous_node_unit.updated_by)
+            previous_node_unit.updated_at = timezone.now()
+            previous_node_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+        else:
+            # Keep the same node unit
+            instance.node_unit = previous_data['node_unit']
+
+        # Handle dispenser_unit change
+        if '_new_dispenser_unit' in validated_data:
+            new_dispenser_unit = validated_data['_new_dispenser_unit']
+            previous_dispenser_unit = validated_data['_previous_dispenser_unit']
+            # Update the instance
+            instance.dispenser_unit = new_dispenser_unit
+        else:
+            # Keep the same dispenser unit
+            instance.dispenser_unit = previous_data['dispenser_unit']
+
+        # Update the mapping instance
+        instance.updated_by = (user.id if user else instance.updated_by)
+        instance.updated_at = timezone.now()
+        instance.save()
+
+        return instance
+
+
+class EditStatusAndAssignedStatusOfNodeDispenserCustomerMappingSerializer(serializers.ModelSerializer):
+    status = serializers.BooleanField(required=False)
+    assigned_status = serializers.BooleanField(required=False)
+    
+    class Meta:
+        model = NodeDispenserCustomerMapping
+        fields = ['status', 'assigned_status']
+        
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+                # Check if both fields are provided
+        if 'status' in attrs and 'assigned_status' in attrs:
+            raise serializers.ValidationError("Only one field can be updated at a time: either 'status' or 'assigned_status'.")
+        
+        # Check if no fields are provided
+        if 'status' not in attrs and 'assigned_status' not in attrs:
+            raise serializers.ValidationError("Either 'status' or 'assigned_status' must be provided.")
+        return attrs
+    
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user = self.context.get("user", None)
+        if 'status' in validated_data:
+            instance.status = validated_data['status']
+            instance.updated_by = (user.id if user else instance.updated_by)
+            instance.updated_at = timezone.now()
+            instance.save()
+                # Update assigned_status field and related unit statuses
+        elif 'assigned_status' in validated_data:
+            new_assigned_status = validated_data['assigned_status']
+            instance.assigned_status = new_assigned_status
+            
+            # If assigned_status is being disabled, also disable the status field
+            if not new_assigned_status:
+                instance.status = False
+
+            # Mark node unit as assigned
+            instance.node_unit.assigned_status = False
+            instance.node_unit.updated_by = user.id
+            instance.node_unit.updated_at = timezone.now()
+            instance.node_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])  
+
+        instance.save()          
+        return instance
+
+
+class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        instance = self.context.get('instance')  # Changed from getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+        
+        # Check if assigned_status is True
+        if instance.assigned_status is True:
+            raise serializers.ValidationError("Cannot delete node dispenser customer mapping that is currently assigned to a customer.")
+        return attrs
+    
+    def delete(self, instance):
+        instance.delete()
+        return instance 
