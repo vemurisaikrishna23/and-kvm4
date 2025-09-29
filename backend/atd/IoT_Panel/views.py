@@ -58,6 +58,20 @@ class LoginView(APIView):
 
 
 
+# #Get Access Token for Customer
+# class GetAccessTokenForCustomer(APIView):
+#     permission_classes = [AllowAny]
+
+#     def post(self, request, format=None):
+#         serializer = GetAccessTokenForCustomerSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         user = serializer.validated_data['user']
+#         tokens = get_tokens_for_user(user)
+#         return Response({
+#             'message': 'Access Token for Customer generated successfully',
+#             **tokens
+#         }, status=status.HTTP_200_OK)
+
 #Get Customers
 class GetCustomers(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -98,6 +112,7 @@ class AddDispenserUnit(APIView):
         else:
             return Response({"error": "You are not authorized to add a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
+
 #Get Dispenser Units
 class GetDispenserUnits(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -114,6 +129,23 @@ class GetDispenserUnits(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get dispenser units"}, status=status.HTTP_403_FORBIDDEN)
+
+#Get Unassigned Dispenser Units
+class GetUnassignedDispenserUnits(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        if "IOT Admin" in roles:
+            dispenser_units = DispenserUnits.objects.filter(assigned_status=False)
+            serializer = GetDispenserUnitsSerializer(dispenser_units, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get unassigned dispenser units"}, status=status.HTTP_403_FORBIDDEN)
 
 #Edit Dispenser Unit
 class EditDispenserUnit(APIView):
@@ -206,6 +238,22 @@ class GetGunUnits(APIView):
             return Response({"error": "You are not authorized to get gun units"}, status=status.HTTP_403_FORBIDDEN)
 
 
+#Get Unassigned Gun Units
+class GetUnassignedGunUnits(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            gun_units = GunUnits.objects.filter(assigned_status=False)
+            serializer = GetGunUnitsSerializer(gun_units, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get unassigned gun units"}, status=status.HTTP_403_FORBIDDEN)
+
 #Edit Gun Unit
 class EditGunUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -296,6 +344,22 @@ class GetNodeUnits(APIView):
         else:
             return Response({"error": "You are not authorized to get node units"}, status=status.HTTP_403_FORBIDDEN)
 
+
+#Get Unassigned Node Units
+class GetUnassignedNodeUnits(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            node_units = NodeUnits.objects.filter(assigned_status=False)
+            serializer = GetNodeUnitsSerializer(node_units, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get unassigned node units"}, status=status.HTTP_403_FORBIDDEN)
 
 #Edit Node Unit
 class EditNodeUnit(APIView):
@@ -632,3 +696,28 @@ class DeleteNodeDispenserCustomerMapping(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to delete a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+## Add Delivery Location Mapping Dispenser Unit
+# class AddDeliveryLocationMappingDispenserUnit(APIView):
+#     renderer_classes = [IoT_PanelRenderer]
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request, format=None):
+#         user = request.user
+#         user_id = getattr(user, "id", None)
+#         roles = get_user_roles(user_id)
+        
+#         if ["IOT Admin", "Customer"] in roles:
+#             serializer = AddDeliveryLocationMappingDispenserUnitSerializer(data=request.data, context={"user": user})
+#             if serializer.is_valid(raise_exception=True):
+#                 try:
+#                     serializer.save()
+#                     return Response({
+#                         "message": "Delivery Location Mapping Dispenser Unit Created Successfully",
+#                     }, status=status.HTTP_201_CREATED)
+#                 except serializers.ValidationError as e:
+#                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+#         else:
+#             return Response({"error": "You are not authorized to add a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)

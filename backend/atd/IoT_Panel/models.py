@@ -126,4 +126,22 @@ class NodeDispenserCustomerMapping(models.Model):
         return f"Map {self.id}: Cust-{self.customer}, Node-{self.node_unit_id}, Disp-{self.dispenser_unit_id or 'None'}"
 
 
+class DeliveryLocation_Mapping_DispenserUnit(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    delivery_location_id = models.BigIntegerField(help_text="Delivery Location ID where dispenser unit is installed")
+    dispenser_gun_mapping_id = models.ForeignKey('Dispenser_Gun_Mapping_To_Customer', on_delete=models.CASCADE),
+    DU_Accessible_delivery_locations = models.JSONField(default=list,help_text="Stores a list of delivery location IDs of this customer who can access this dispenser unit")
+    DU_Unaccessible_delivery_locations = models.JSONField(default=list,help_text="Stores a list of delivery location IDs of this customer who cannot access this dispenser unit temporarily")
+    remarks = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    updated_by = models.PositiveBigIntegerField(blank=True, null=True)
 
+    class Meta:
+        db_table = "delivery_location_mapping_dispenser_unit"
+        verbose_name = "Delivery Location Mapping Dispenser Unit"
+        verbose_name_plural = "Delivery Location Mappings"
+
+    def __str__(self):
+        return f"Map {self.id}: Delivery Location-{self.delivery_location_id}, Dispenser-{self.dispenser_gun_mapping_id}"

@@ -1004,3 +1004,49 @@ class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
     def delete(self, instance):
         instance.delete()
         return instance 
+
+
+# class AddDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSerializer):
+#     delivery_location_id = serializers.IntegerField(required=True)
+#     dispenser_gun_mapping_id = serializers.IntegerField(required=True)
+#     DU_Accessible_delivery_locations = serializers.JSONField(required=False)
+#     DU_Unaccessible_delivery_locations = serializers.JSONField(required=False)
+#     remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+#     class Meta:
+#         model = DeliveryLocation_Mapping_DispenserUnit
+#         fields = ['delivery_location_id', 'dispenser_gun_mapping_id', 'DU_Accessible_delivery_locations', 'DU_Unaccessible_delivery_locations', 'remarks']
+
+#     def validate_delivery_location_id(self, value):
+#         if not DeliveryLocations.objects.filter(id=value).exists():
+#             raise serializers.ValidationError("Delivery location does not exist.")
+#         return value
+
+#     def validate_dispenser_gun_mapping_id(self, value):
+#         if not Dispenser_Gun_Mapping_To_Customer.objects.filter(id=value).exists():
+#             raise serializers.ValidationError("Dispenser gun mapping does not exist.")
+#         return value
+    
+    
+#     @transaction.atomic
+#     def create(self, validated_data):
+#         user = self.context.get("user", None)
+#         delivery_location_id = validated_data['delivery_location_id']
+#         dispenser_gun_mapping_id = validated_data['dispenser_gun_mapping_id']
+#         DU_Accessible_delivery_locations = validated_data['DU_Accessible_delivery_locations']
+#         DU_Unaccessible_delivery_locations = validated_data['DU_Unaccessible_delivery_locations']
+#         remarks = validated_data.get('remarks')
+        
+#         instance = DeliveryLocation_Mapping_DispenserUnit.objects.create(
+#             delivery_location_id=delivery_location_id,
+#             dispenser_gun_mapping_id=dispenser_gun_mapping_id,
+#             DU_Accessible_delivery_locations=DU_Accessible_delivery_locations,
+#             DU_Unaccessible_delivery_locations=DU_Unaccessible_delivery_locations,
+#             remarks=remarks,
+#             created_by=user.id,
+#             created_at=timezone.now()
+#         )
+#         return instance
+
+
+# GetAccessTokenForCustomerSerializer
