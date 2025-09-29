@@ -4,7 +4,7 @@ from .views import *
 
 urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
-
+    path("auth/validate-token-and-get-new-access-token/", ValidateTokenAndGetNewAccessToken.as_view(), name="validate-token-and-get-new-access-token"),
     path("customers/get/", GetCustomers.as_view(), name="get-customers"),
     
     path("dispenser-unit/add/", AddDispenserUnit.as_view(), name="add-dispenser-unit"),
@@ -38,5 +38,8 @@ urlpatterns = [
     path("node-dispenser-customer-mapping/edit/<int:id>/", EditNodeDispenserCustomerMapping.as_view(), name="edit-node-dispenser-customer-mapping"),
     path("node-dispenser-customer-mapping/edit-status/<int:id>/", EditStatusAndAssignedStatusOfNodeDispenserCustomerMapping.as_view(), name="edit-status-and-assigned-status-of-node-dispenser-customer-mapping"),
     path("node-dispenser-customer-mapping/delete/<int:id>/", DeleteNodeDispenserCustomerMapping.as_view(), name="delete-node-dispenser-customer-mapping"),
+
+    # path("delivery-location-mapping-dispenser-unit/add/", AddDeliveryLocationMappingDispenserUnit.as_view(), name="add-delivery-location-mapping-dispenser-unit"),
+
 ]
 

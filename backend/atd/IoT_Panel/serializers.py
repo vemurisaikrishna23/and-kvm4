@@ -31,6 +31,8 @@ class LoginSerializer(serializers.ModelSerializer):
         return attrs
 
 
+
+
 class GetCustomersSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customers
@@ -1005,7 +1007,6 @@ class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
         instance.delete()
         return instance 
 
-
 # class AddDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSerializer):
 #     delivery_location_id = serializers.IntegerField(required=True)
 #     dispenser_gun_mapping_id = serializers.IntegerField(required=True)
@@ -1027,14 +1028,51 @@ class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
 #             raise serializers.ValidationError("Dispenser gun mapping does not exist.")
 #         return value
     
+#     def validate(self, attrs):
+#         delivery_location_id = attrs.get('delivery_location_id')
+#         dispenser_gun_mapping_id = attrs.get('dispenser_gun_mapping_id')
+#         DU_Accessible_delivery_locations = attrs.get('DU_Accessible_delivery_locations')
+#         DU_Unaccessible_delivery_locations = attrs.get('DU_Unaccessible_delivery_locations')
+        
+#         # Check if dispenser_gun_mapping_id already exists in this table
+#         if DeliveryLocation_Mapping_DispenserUnit.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id).exists():
+#             raise serializers.ValidationError("This dispenser gun mapping is already assigned to a delivery location.")
+        
+#         # Validate DU_Accessible_delivery_locations if provided
+#         if DU_Accessible_delivery_locations:
+#             if not isinstance(DU_Accessible_delivery_locations, list):
+#                 raise serializers.ValidationError("DU_Accessible_delivery_locations must be a list.")
+            
+#             # Check each ID in the list exists in DeliveryLocations
+#             for location_id in DU_Accessible_delivery_locations:
+#                 if not isinstance(location_id, int):
+#                     raise serializers.ValidationError(f"Invalid location ID: {location_id}. Must be an integer.")
+#                 if not DeliveryLocations.objects.filter(id=location_id).exists():
+#                     raise serializers.ValidationError(f"Delivery location with ID {location_id} does not exist.")
+        
+#         # Validate DU_Unaccessible_delivery_locations if provided
+#         if DU_Unaccessible_delivery_locations:
+#             if not isinstance(DU_Unaccessible_delivery_locations, list):
+#                 raise serializers.ValidationError("DU_Unaccessible_delivery_locations must be a list.")
+            
+#             # Check that all unaccessible locations are present in accessible locations
+#             if not DU_Accessible_delivery_locations:
+#                 raise serializers.ValidationError("DU_Accessible_delivery_locations cannot be empty when DU_Unaccessible_delivery_locations is provided.")
+            
+#             for location_id in DU_Unaccessible_delivery_locations:
+#                 if not isinstance(location_id, int):
+#                     raise serializers.ValidationError(f"Invalid location ID: {location_id}. Must be an integer.")
+#                 if location_id not in DU_Accessible_delivery_locations:
+#                     raise serializers.ValidationError(f"Location ID {location_id} in DU_Unaccessible_delivery_locations must be present in DU_Accessible_delivery_locations.")
+#         return attrs
     
 #     @transaction.atomic
 #     def create(self, validated_data):
 #         user = self.context.get("user", None)
 #         delivery_location_id = validated_data['delivery_location_id']
 #         dispenser_gun_mapping_id = validated_data['dispenser_gun_mapping_id']
-#         DU_Accessible_delivery_locations = validated_data['DU_Accessible_delivery_locations']
-#         DU_Unaccessible_delivery_locations = validated_data['DU_Unaccessible_delivery_locations']
+#         DU_Accessible_delivery_locations = validated_data.get('DU_Accessible_delivery_locations', [])
+#         DU_Unaccessible_delivery_locations = validated_data.get('DU_Unaccessible_delivery_locations', [])
 #         remarks = validated_data.get('remarks')
         
 #         instance = DeliveryLocation_Mapping_DispenserUnit.objects.create(
@@ -1048,5 +1086,3 @@ class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
 #         )
 #         return instance
 
-
-# GetAccessTokenForCustomerSerializer

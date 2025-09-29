@@ -8,6 +8,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import *
 from existing_tables.models import *
 from .renderers import *
+import hashlib
+
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -57,20 +59,47 @@ class LoginView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+#For OMS Login API To Django Framework access token
+class ValidateTokenAndGetNewAccessToken(APIView):
+    permission_classes = [AllowAny]
 
-# #Get Access Token for Customer
-# class GetAccessTokenForCustomer(APIView):
-#     permission_classes = [AllowAny]
+    def post(self, request, format=None):
+        token = request.data.get('token')
+        user_id = request.data.get('user_id')
 
-#     def post(self, request, format=None):
-#         serializer = GetAccessTokenForCustomerSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         user = serializer.validated_data['user']
-#         tokens = get_tokens_for_user(user)
-#         return Response({
-#             'message': 'Access Token for Customer generated successfully',
-#             **tokens
-#         }, status=status.HTTP_200_OK)
+        if not token:
+            return Response({'error': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user_id:
+            return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            token_id, token_plaintext = token.split("|", 1)
+            token_hash = hashlib.sha256(token_plaintext.encode()).hexdigest()
+        except ValueError:
+            return Response({'error': 'Invalid token format'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
+            
+        try:
+            token = PersonalAccessTokens.objects.get(id=token_id, token=token_hash, tokenable_id=user_id)
+        except PersonalAccessTokens.DoesNotExist:
+            return Response({'error': 'Token verification failed'}, status=status.HTTP_404_NOT_FOUND)
+
+        tokens = get_tokens_for_user(user)
+        role = get_user_roles(user_id)
+
+            
+        return Response({
+            'message': 'Token validated successfully',
+            'access_token': tokens['access'],
+            'refresh_token': tokens['refresh'],
+            'role': role,
+        }, status=status.HTTP_200_OK)
+
 
 #Get Customers
 class GetCustomers(APIView):
@@ -699,7 +728,7 @@ class DeleteNodeDispenserCustomerMapping(APIView):
 
 
 
-## Add Delivery Location Mapping Dispenser Unit
+# Add Delivery Location Mapping Dispenser Unit
 # class AddDeliveryLocationMappingDispenserUnit(APIView):
 #     renderer_classes = [IoT_PanelRenderer]
 #     permission_classes = [IsAuthenticated]
