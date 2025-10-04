@@ -39,7 +39,10 @@ urlpatterns = [
     path("node-dispenser-customer-mapping/edit-status/<int:id>/", EditStatusAndAssignedStatusOfNodeDispenserCustomerMapping.as_view(), name="edit-status-and-assigned-status-of-node-dispenser-customer-mapping"),
     path("node-dispenser-customer-mapping/delete/<int:id>/", DeleteNodeDispenserCustomerMapping.as_view(), name="delete-node-dispenser-customer-mapping"),
 
-    # path("delivery-location-mapping-dispenser-unit/add/", AddDeliveryLocationMappingDispenserUnit.as_view(), name="add-delivery-location-mapping-dispenser-unit"),
-
+    path("delivery-location-mapping-dispenser-unit/add/", AddDeliveryLocationMappingDispenserUnit.as_view(), name="add-delivery-location-mapping-dispenser-unit"),
+    path("delivery-location-mapping-dispenser-unit/get/", GetDeliveryLocationMappingDispenserUnit.as_view(), name="get-delivery-location-mapping-dispenser-unit"),
+    path("delivery-location-mapping-dispenser-unit/get/<int:customer_id>/", GetDeliveryLocationMappingDispenserUnitByCustomerID.as_view(), name="get-delivery-location-mapping-dispenser-unit-by-customer-id"),
+    path("delivery-location-mapping-dispenser-unit/edit/<int:id>/", EditDeliveryLocationMappingDispenserUnit.as_view(), name="edit-delivery-location-mapping-dispenser-unit"),
+    path("delivery-location-mapping-dispenser-unit/delete/<int:id>/", DeleteDeliveryLocationMappingDispenserUnit.as_view(), name="delete-delivery-location-mapping-dispenser-unit"),
 ]
 

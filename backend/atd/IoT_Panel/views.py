@@ -729,24 +729,111 @@ class DeleteNodeDispenserCustomerMapping(APIView):
 
 
 # Add Delivery Location Mapping Dispenser Unit
-# class AddDeliveryLocationMappingDispenserUnit(APIView):
-#     renderer_classes = [IoT_PanelRenderer]
-#     permission_classes = [IsAuthenticated]
+class AddDeliveryLocationMappingDispenserUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
 
-#     def post(self, request, format=None):
-#         user = request.user
-#         user_id = getattr(user, "id", None)
-#         roles = get_user_roles(user_id)
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(roles)
         
-#         if ["IOT Admin", "Customer"] in roles:
-#             serializer = AddDeliveryLocationMappingDispenserUnitSerializer(data=request.data, context={"user": user})
-#             if serializer.is_valid(raise_exception=True):
-#                 try:
-#                     serializer.save()
-#                     return Response({
-#                         "message": "Delivery Location Mapping Dispenser Unit Created Successfully",
-#                     }, status=status.HTTP_201_CREATED)
-#                 except serializers.ValidationError as e:
-#                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-#         else:
-#             return Response({"error": "You are not authorized to add a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            serializer = AddDeliveryLocationMappingDispenserUnitSerializer(data=request.data, context={"user": user, "roles": roles})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Delivery Location Mapping Dispenser Unit Created Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to add a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Delivery Location Mapping Dispenser Unit
+class GetDeliveryLocationMappingDispenserUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            delivery_location_mapping_dispenser_unit = DeliveryLocation_Mapping_DispenserUnit.objects.all()
+            serializer = GetDeliveryLocationMappingDispenserUnitSerializer(delivery_location_mapping_dispenser_unit, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+class GetDeliveryLocationMappingDispenserUnitByCustomerID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            # Validate that customer_id matches the customer from dispenser_gun_mapping_id
+            delivery_location_mapping_dispenser_unit = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+                dispenser_gun_mapping_id__customer=customer_id
+            )
+            serializer = GetDeliveryLocationMappingDispenserUnitSerializer(delivery_location_mapping_dispenser_unit, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+            
+#Edit Delivery Location Mapping Dispenser Unit
+class EditDeliveryLocationMappingDispenserUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            try:
+                instance = DeliveryLocation_Mapping_DispenserUnit.objects.get(id=id)
+            except DeliveryLocation_Mapping_DispenserUnit.DoesNotExist:
+                return Response({'error': 'Delivery Location Mapping Dispenser Unit with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = EditDeliveryLocationMappingDispenserUnitSerializer(instance, data=request.data, partial=True, context={"user": user, "roles": roles})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Delivery Location Mapping Dispenser Unit Updated Successfully",
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+class DeleteDeliveryLocationMappingDispenserUnit(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            try:
+                instance = DeliveryLocation_Mapping_DispenserUnit.objects.get(id=id)
+            except DeliveryLocation_Mapping_DispenserUnit.DoesNotExist:
+                return Response({'error': 'Delivery Location Mapping Dispenser Unit with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = DeleteDeliveryLocationMappingDispenserUnitSerializer(data={'id': id}, context={'instance': instance, 'roles': roles})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.delete(instance)
+                    return Response({'message': 'Delivery Location Mapping Dispenser Unit Deleted Successfully'}, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to delete a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)

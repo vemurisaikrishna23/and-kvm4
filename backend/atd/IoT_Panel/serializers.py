@@ -1007,82 +1007,365 @@ class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
         instance.delete()
         return instance 
 
-# class AddDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSerializer):
-#     delivery_location_id = serializers.IntegerField(required=True)
-#     dispenser_gun_mapping_id = serializers.IntegerField(required=True)
-#     DU_Accessible_delivery_locations = serializers.JSONField(required=False)
-#     DU_Unaccessible_delivery_locations = serializers.JSONField(required=False)
-#     remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
-#     class Meta:
-#         model = DeliveryLocation_Mapping_DispenserUnit
-#         fields = ['delivery_location_id', 'dispenser_gun_mapping_id', 'DU_Accessible_delivery_locations', 'DU_Unaccessible_delivery_locations', 'remarks']
 
-#     def validate_delivery_location_id(self, value):
-#         if not DeliveryLocations.objects.filter(id=value).exists():
-#             raise serializers.ValidationError("Delivery location does not exist.")
-#         return value
+class AddDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSerializer):
+    delivery_location_id = serializers.IntegerField(required=True)
+    dispenser_gun_mapping_id = serializers.IntegerField(required=True)
+    DU_Accessible_delivery_locations = serializers.JSONField(required=False)
+    remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
-#     def validate_dispenser_gun_mapping_id(self, value):
-#         if not Dispenser_Gun_Mapping_To_Customer.objects.filter(id=value).exists():
-#             raise serializers.ValidationError("Dispenser gun mapping does not exist.")
-#         return value
+    class Meta:
+        model = DeliveryLocation_Mapping_DispenserUnit
+        fields = ['delivery_location_id', 'dispenser_gun_mapping_id', 'DU_Accessible_delivery_locations','remarks']
+
+    def validate_delivery_location_id(self, value):
+        if not DeliveryLocations.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Delivery location does not exist.")
+        return value
+
+    def validate_dispenser_gun_mapping_id(self, value):
+        if not Dispenser_Gun_Mapping_To_Customer.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Dispenser gun mapping does not exist.")
+        return value
     
-#     def validate(self, attrs):
-#         delivery_location_id = attrs.get('delivery_location_id')
-#         dispenser_gun_mapping_id = attrs.get('dispenser_gun_mapping_id')
-#         DU_Accessible_delivery_locations = attrs.get('DU_Accessible_delivery_locations')
-#         DU_Unaccessible_delivery_locations = attrs.get('DU_Unaccessible_delivery_locations')
+    def validate(self, attrs):
+        delivery_location_id = attrs.get('delivery_location_id')
+        dispenser_gun_mapping_id = attrs.get('dispenser_gun_mapping_id')
+        DU_Accessible_delivery_locations = attrs.get('DU_Accessible_delivery_locations')
         
-#         # Check if dispenser_gun_mapping_id already exists in this table
-#         if DeliveryLocation_Mapping_DispenserUnit.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id).exists():
-#             raise serializers.ValidationError("This dispenser gun mapping is already assigned to a delivery location.")
-        
-#         # Validate DU_Accessible_delivery_locations if provided
-#         if DU_Accessible_delivery_locations:
-#             if not isinstance(DU_Accessible_delivery_locations, list):
-#                 raise serializers.ValidationError("DU_Accessible_delivery_locations must be a list.")
-            
-#             # Check each ID in the list exists in DeliveryLocations
-#             for location_id in DU_Accessible_delivery_locations:
-#                 if not isinstance(location_id, int):
-#                     raise serializers.ValidationError(f"Invalid location ID: {location_id}. Must be an integer.")
-#                 if not DeliveryLocations.objects.filter(id=location_id).exists():
-#                     raise serializers.ValidationError(f"Delivery location with ID {location_id} does not exist.")
-        
-#         # Validate DU_Unaccessible_delivery_locations if provided
-#         if DU_Unaccessible_delivery_locations:
-#             if not isinstance(DU_Unaccessible_delivery_locations, list):
-#                 raise serializers.ValidationError("DU_Unaccessible_delivery_locations must be a list.")
-            
-#             # Check that all unaccessible locations are present in accessible locations
-#             if not DU_Accessible_delivery_locations:
-#                 raise serializers.ValidationError("DU_Accessible_delivery_locations cannot be empty when DU_Unaccessible_delivery_locations is provided.")
-            
-#             for location_id in DU_Unaccessible_delivery_locations:
-#                 if not isinstance(location_id, int):
-#                     raise serializers.ValidationError(f"Invalid location ID: {location_id}. Must be an integer.")
-#                 if location_id not in DU_Accessible_delivery_locations:
-#                     raise serializers.ValidationError(f"Location ID {location_id} in DU_Unaccessible_delivery_locations must be present in DU_Accessible_delivery_locations.")
-#         return attrs
-    
-#     @transaction.atomic
-#     def create(self, validated_data):
-#         user = self.context.get("user", None)
-#         delivery_location_id = validated_data['delivery_location_id']
-#         dispenser_gun_mapping_id = validated_data['dispenser_gun_mapping_id']
-#         DU_Accessible_delivery_locations = validated_data.get('DU_Accessible_delivery_locations', [])
-#         DU_Unaccessible_delivery_locations = validated_data.get('DU_Unaccessible_delivery_locations', [])
-#         remarks = validated_data.get('remarks')
-        
-#         instance = DeliveryLocation_Mapping_DispenserUnit.objects.create(
-#             delivery_location_id=delivery_location_id,
-#             dispenser_gun_mapping_id=dispenser_gun_mapping_id,
-#             DU_Accessible_delivery_locations=DU_Accessible_delivery_locations,
-#             DU_Unaccessible_delivery_locations=DU_Unaccessible_delivery_locations,
-#             remarks=remarks,
-#             created_by=user.id,
-#             created_at=timezone.now()
-#         )
-#         return instance
+        # Get user roles from context
+        roles = self.context.get("roles", [])
 
+        if DeliveryLocation_Mapping_DispenserUnit.objects.filter(delivery_location_id=delivery_location_id).exists():
+            raise serializers.ValidationError("This delivery location id is already exists.")
+                
+        # Check if dispenser_gun_mapping_id already exists in this table
+        if DeliveryLocation_Mapping_DispenserUnit.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id).exists():
+            raise serializers.ValidationError("This dispenser gun mapping is already assigned to a delivery location.")
+        
+        # Accounts Admin role validation - can only add delivery locations that belong to their customer
+        if 'Accounts Admin' in roles:
+            # Get the customer ID from the dispenser gun mapping
+            try:
+                dispenser_gun_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=dispenser_gun_mapping_id)
+                customer_id = dispenser_gun_mapping.customer
+                
+                # Check if the delivery location belongs to this customer
+                if not DeliveryLocations.objects.filter(id=delivery_location_id, customer=customer_id).exists():
+                    raise serializers.ValidationError("You can only add delivery locations that belong to your customer.")
+                
+                # Validate DU_Accessible_delivery_locations - all must belong to the same customer
+                if DU_Accessible_delivery_locations:
+                    for location_id in DU_Accessible_delivery_locations:
+                        if not DeliveryLocations.objects.filter(id=location_id, customer=customer_id).exists():
+                            raise serializers.ValidationError(f"Delivery location with ID {location_id} does not belong to your customer.")
+                            
+            except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+                raise serializers.ValidationError("Invalid dispenser gun mapping ID.")
+        
+        # IOT Admin role validation - ensure all delivery locations belong to the same customer
+        elif 'IOT Admin' in roles:
+            try:
+                dispenser_gun_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=dispenser_gun_mapping_id)
+                customer_id = dispenser_gun_mapping.customer
+                
+                # Check if the main delivery location belongs to the same customer as dispenser gun mapping
+                if not DeliveryLocations.objects.filter(id=delivery_location_id, customer=customer_id).exists():
+                    raise serializers.ValidationError("All delivery locations must belong to the same customer as the dispenser gun mapping.")
+                
+                # Validate DU_Accessible_delivery_locations - all must belong to the same customer
+                if DU_Accessible_delivery_locations:
+                    for location_id in DU_Accessible_delivery_locations:
+                        if not DeliveryLocations.objects.filter(id=location_id, customer=customer_id).exists():
+                            raise serializers.ValidationError(f"All delivery locations must belong to the same customer. Location ID {location_id} belongs to a different customer.")
+                            
+            except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+                raise serializers.ValidationError("Invalid dispenser gun mapping ID.")
+        
+        # Validate DU_Accessible_delivery_locations if provided
+        if DU_Accessible_delivery_locations:
+            if not isinstance(DU_Accessible_delivery_locations, list):
+                raise serializers.ValidationError("DU_Accessible_delivery_locations must be a list.")
+            
+            for location_id in DU_Accessible_delivery_locations:
+                if not isinstance(location_id, int):
+                    raise serializers.ValidationError(f"Invalid delivery location ID: {location_id}. Must be an integer.")
+                if not DeliveryLocations.objects.filter(id=location_id).exists():
+                    raise serializers.ValidationError(f"Delivery delivery location with ID {location_id} does not exist.")
+        
+        return attrs
+    
+    @transaction.atomic
+    def create(self, validated_data):
+        user = self.context.get("user", None)
+        delivery_location_id = validated_data['delivery_location_id']
+        dispenser_gun_mapping_id = Dispenser_Gun_Mapping_To_Customer.objects.get(id=validated_data['dispenser_gun_mapping_id'])
+        DU_Accessible_delivery_locations = validated_data.get('DU_Accessible_delivery_locations', [])
+        remarks = validated_data.get('remarks')
+        
+        instance = DeliveryLocation_Mapping_DispenserUnit.objects.create(
+            delivery_location_id=delivery_location_id,
+            dispenser_gun_mapping_id=dispenser_gun_mapping_id,
+            DU_Accessible_delivery_locations=DU_Accessible_delivery_locations,
+            remarks=remarks,
+            created_by=user.id,
+            created_at=timezone.now()
+        )
+        return instance
+
+
+
+class GetDeliveryLocationsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryLocations
+        fields = '__all__'
+
+
+
+class GetDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSerializer):
+    dispenser_gun_mapping_id = GetDispenserGunMappingToCustomerSerializer()
+    class Meta:
+        model = DeliveryLocation_Mapping_DispenserUnit
+        fields = '__all__'
+        depth = 1
+
+    def to_representation(self, instance):
+        """Custom method to get delivery location details"""
+        data = super().to_representation(instance)
+        
+        # Get delivery location details if delivery_location_id exists
+        if instance.delivery_location_id:
+            try:
+                delivery_location = DeliveryLocations.objects.get(id=instance.delivery_location_id)
+                # You can add more fields from delivery_location as needed
+                data['delivery_location_id'] = {
+                    'id': delivery_location.id,
+                    'name': delivery_location.name,  # Assuming there's a name field
+                    # Add other fields you need
+                }
+            except DeliveryLocations.DoesNotExist:
+                data['delivery_location'] = None
+        else:
+            data['delivery_location'] = None
+
+            # Get details for DU_Accessible_delivery_locations if they exist
+        if instance.DU_Accessible_delivery_locations:
+            accessible_locations = []
+            for location_id in instance.DU_Accessible_delivery_locations:
+                try:
+                    location = DeliveryLocations.objects.get(id=location_id)
+                    accessible_locations.append({
+                        'id': location.id,
+                        'name': location.name,
+                    })
+                except DeliveryLocations.DoesNotExist:
+                    # Include location even if it doesn't exist (for data integrity)
+                    accessible_locations.append({
+                        'id': location_id,
+                        'name': f"Unknown Location (ID: {location_id})",
+                        'customer': None,
+                    })
+            data['DU_Accessible_delivery_locations'] = accessible_locations
+        else:
+            data['DU_Accessible_delivery_locations'] = []
+        return data
+
+        
+
+class EditDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSerializer):
+    delivery_location_id = serializers.IntegerField(required=False)
+    dispenser_gun_mapping_id = serializers.IntegerField(required=False)
+    DU_Accessible_delivery_locations = serializers.JSONField(required=False)
+    remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = DeliveryLocation_Mapping_DispenserUnit
+        fields = ['delivery_location_id', 'dispenser_gun_mapping_id', 'DU_Accessible_delivery_locations', 'remarks']
+
+    def validate_delivery_location_id(self, value):
+        if value is not None and not DeliveryLocations.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Delivery location does not exist.")
+        return value
+
+    def validate_dispenser_gun_mapping_id(self, value):
+        if value is not None and not Dispenser_Gun_Mapping_To_Customer.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Dispenser gun mapping does not exist.")
+        return value
+
+    def validate_DU_Accessible_delivery_locations(self, value):
+        if value is not None:
+            if not isinstance(value, list):
+                raise serializers.ValidationError("DU_Accessible_delivery_locations must be a list.")
+            
+            # Check each ID in the list exists in DeliveryLocations
+            for location_id in value:
+                if not isinstance(location_id, int):
+                    raise serializers.ValidationError(f"Invalid location ID: {location_id}. Must be an integer.")
+                if not DeliveryLocations.objects.filter(id=location_id).exists():
+                    raise serializers.ValidationError(f"Delivery location with ID {location_id} does not exist.")
+        return value
+
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+
+        # Read previous data
+        previous_data = {
+            'delivery_location_id': instance.delivery_location_id,
+            'dispenser_gun_mapping_id': instance.dispenser_gun_mapping_id.id if instance.dispenser_gun_mapping_id else None,
+            'DU_Accessible_delivery_locations': instance.DU_Accessible_delivery_locations or [],
+            'remarks': instance.remarks,
+        }
+
+        # Get user roles from context
+        roles = self.context.get("roles", [])
+
+        # Check if dispenser_gun_mapping_id is being changed
+        new_dispenser_gun_mapping_id = attrs.get('dispenser_gun_mapping_id')
+        if new_dispenser_gun_mapping_id is not None:
+            # Check if the new dispenser_gun_mapping_id is already assigned to another delivery location mapping
+            existing_mapping = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+                dispenser_gun_mapping_id=new_dispenser_gun_mapping_id
+            ).exclude(id=instance.id)
+            
+            if existing_mapping.exists():
+                raise serializers.ValidationError("This dispenser gun mapping is already assigned to another delivery location.")
+
+        # Role-based validation for delivery locations
+        delivery_location_id = attrs.get('delivery_location_id')
+        DU_Accessible_delivery_locations = attrs.get('DU_Accessible_delivery_locations')
+        
+        # Use new values if provided, otherwise use previous values
+        final_delivery_location_id = delivery_location_id if delivery_location_id is not None else previous_data['delivery_location_id']
+        final_dispenser_gun_mapping_id = new_dispenser_gun_mapping_id if new_dispenser_gun_mapping_id is not None else previous_data['dispenser_gun_mapping_id']
+        final_accessible_locations = DU_Accessible_delivery_locations if DU_Accessible_delivery_locations is not None else previous_data['DU_Accessible_delivery_locations']
+
+        # Accounts Admin role validation - can only edit delivery locations that belong to their customer
+        if 'Accounts Admin' in roles:
+            # Get the customer ID from the dispenser gun mapping
+            try:
+                dispenser_gun_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=final_dispenser_gun_mapping_id)
+                customer_id = dispenser_gun_mapping.customer
+                
+                # Check if the delivery location belongs to this customer
+                if not DeliveryLocations.objects.filter(id=final_delivery_location_id, customer=customer_id).exists():
+                    raise serializers.ValidationError("You can only edit delivery locations that belong to your customer.")
+                
+                # Validate DU_Accessible_delivery_locations - all must belong to the same customer
+                if final_accessible_locations:
+                    for location_id in final_accessible_locations:
+                        if not DeliveryLocations.objects.filter(id=location_id, customer=customer_id).exists():
+                            raise serializers.ValidationError(f"Delivery location with ID {location_id} does not belong to your customer.")
+                            
+            except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+                raise serializers.ValidationError("Invalid dispenser gun mapping ID.")
+        
+        # IOT Admin role validation - ensure all delivery locations belong to the same customer
+        elif 'IOT Admin' in roles:
+            try:
+                dispenser_gun_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=final_dispenser_gun_mapping_id)
+                customer_id = dispenser_gun_mapping.customer
+                
+                # Check if the main delivery location belongs to the same customer as dispenser gun mapping
+                if not DeliveryLocations.objects.filter(id=final_delivery_location_id, customer=customer_id).exists():
+                    raise serializers.ValidationError("All delivery locations must belong to the same customer as the dispenser gun mapping.")
+                
+                # Validate DU_Accessible_delivery_locations - all must belong to the same customer
+                if final_accessible_locations:
+                    for location_id in final_accessible_locations:
+                        if not DeliveryLocations.objects.filter(id=location_id, customer=customer_id).exists():
+                            raise serializers.ValidationError(f"All delivery locations must belong to the same customer. Location ID {location_id} belongs to a different customer.")
+                            
+            except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+                raise serializers.ValidationError("Invalid dispenser gun mapping ID.")
+
+        # Store previous data for use in update method
+        attrs['previous_data'] = previous_data
+        return attrs
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user = self.context.get("user", None)
+        previous_data = validated_data.pop('previous_data', {})
+
+        # Update fields only if they are provided and different from previous data
+        fields_to_update = []
+        
+        # Check delivery_location_id
+        if 'delivery_location_id' in validated_data:
+            new_delivery_location_id = validated_data['delivery_location_id']
+            if new_delivery_location_id != previous_data['delivery_location_id']:
+                instance.delivery_location_id = new_delivery_location_id
+                fields_to_update.append('delivery_location_id')
+
+        # Check dispenser_gun_mapping_id
+        if 'dispenser_gun_mapping_id' in validated_data:
+            new_dispenser_gun_mapping_id = validated_data['dispenser_gun_mapping_id']
+            if new_dispenser_gun_mapping_id != previous_data['dispenser_gun_mapping_id']:
+                if new_dispenser_gun_mapping_id is not None:
+                    dispenser_gun_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=new_dispenser_gun_mapping_id)
+                    instance.dispenser_gun_mapping_id = dispenser_gun_mapping
+                else:
+                    instance.dispenser_gun_mapping_id = None
+                fields_to_update.append('dispenser_gun_mapping_id')
+
+        # Check DU_Accessible_delivery_locations
+        if 'DU_Accessible_delivery_locations' in validated_data:
+            new_accessible_locations = validated_data['DU_Accessible_delivery_locations']
+            if new_accessible_locations != previous_data['DU_Accessible_delivery_locations']:
+                instance.DU_Accessible_delivery_locations = new_accessible_locations
+                fields_to_update.append('DU_Accessible_delivery_locations')
+
+        # Check remarks
+        if 'remarks' in validated_data:
+            new_remarks = validated_data['remarks']
+            if new_remarks != previous_data['remarks']:
+                instance.remarks = new_remarks
+                fields_to_update.append('remarks')
+
+        # Only update if there are changes
+        if fields_to_update:
+            instance.updated_by = user.id if user else instance.updated_by
+            instance.updated_at = timezone.now()
+            fields_to_update.extend(['updated_by', 'updated_at'])
+            instance.save(update_fields=fields_to_update)
+        else:
+            # No changes detected
+            pass
+
+        return instance
+
+
+class DeleteDeliveryLocationMappingDispenserUnitSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    
+    def validate(self, attrs):
+        instance = self.context.get('instance')
+        if not instance:
+            raise serializers.ValidationError("Instance not found.")
+        
+        # Get user roles from context
+        roles = self.context.get("roles", [])
+        
+        # Accounts Admin role validation - can only delete delivery location mappings related to their customer
+        if 'Accounts Admin' in roles:
+            # Get the customer ID from the dispenser gun mapping
+            try:
+                dispenser_gun_mapping = instance.dispenser_gun_mapping_id
+                customer_id = dispenser_gun_mapping.customer
+                
+                # Check if the delivery location belongs to this customer
+                if not DeliveryLocations.objects.filter(id=instance.delivery_location_id, customer=customer_id).exists():
+                    raise serializers.ValidationError("You can only delete delivery location mappings that belong to your customer.")   
+            except Exception as e:
+                raise serializers.ValidationError("Invalid delivery location mapping data.")
+        
+        return attrs
+    
+    def delete(self, instance):
+        instance.delete()
+        return instance
+
+        
