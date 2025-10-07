@@ -1368,4 +1368,3 @@ class DeleteDeliveryLocationMappingDispenserUnitSerializer(serializers.Serialize
         instance.delete()
         return instance
 
-        

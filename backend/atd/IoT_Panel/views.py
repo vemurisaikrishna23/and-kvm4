@@ -481,6 +481,7 @@ class GetDispenserGunMappingToCustomer(APIView):
 
 
 #Get Dispenser Gun Mapping to Customer by Customer ID
+#Get Dispenser Gun Mapping to Customer by Customer ID
 class GetDispenserGunMappingToCustomerByCustomerID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -490,13 +491,43 @@ class GetDispenserGunMappingToCustomerByCustomerID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        if "IOT Admin" in roles:
-            dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(customer=customer_id)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            # For Accounts Admin, validate that they can only access their customer's data
+            if "Accounts Admin" in roles:
+                try:
+                    # Validate using PointOfContacts table
+                    # Check if the user belongs to this customer
+                    poc = PointOfContacts.objects.filter(
+                        user_id=user_id,
+                        belong_to_type='customer',
+                        belong_to_id=customer_id
+                    ).first()
+                    
+                    if not poc:
+                        return Response({
+                            "error": "You are not authorized to access this customer's data"
+                        }, status=status.HTTP_403_FORBIDDEN)
+                    
+                    # Get dispenser gun mappings for this specific customer
+                    dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                        customer=customer_id,
+                        assigned_status=True
+                    )
+                except Exception as e:
+                    return Response({
+                        "error": f"Error retrieving customer data: {str(e)}"
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            else:
+                dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer=customer_id,
+                    assigned_status=True
+                )
+            
             serializer = GetDispenserGunMappingToCustomerSerializer(dispenser_gun_mapping_to_customer, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
-
 
 #Edit Dispenser Gun Mapping to Customer
 class EditDispenserGunMappingToCustomer(APIView):
@@ -837,3 +868,50 @@ class DeleteDeliveryLocationMappingDispenserUnit(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to delete a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+# class GetDispenserLocationsAndDispenserGunMappingWithUserID(APIView):
+#     renderer_classes = [IoT_PanelRenderer]
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, user_id, format=None):
+#         user = request.user
+#         id = getattr(user, "id", None)
+#         roles = get_user_roles(id)
+#         print(roles)
+        
+#         if "IOT Admin" in roles:
+#             try:
+#                 target_user = Users.objects.get(id=user_id)
+#             except Users.DoesNotExist:
+#                 return Response({
+#                     "error": "User not found"
+#                 }, status=status.HTTP_404_NOT_FOUND)
+#             target_user_roles = get_user_roles(user_id)
+#             if "Accounts Admin" in target_user_roles:
+#                 try:
+#                 # Get the user's organization
+#                     user_organization = target_user.organization
+#                 # Find customers that belong to this organization
+#                     customers = Customers.objects.filter(organization=user_organization)
+#                     customer_ids = list(customers.values_list('id', flat=True))
+                    
+#                     # Get delivery locations for these customers
+#                     delivery_locations = DeliveryLocations.objects.filter(customer__in=customer_ids)
+#                     delivery_location_ids = list(delivery_locations.values_list('id', flat=True))
+#                 # Get dispenser gun mappings that are accessible to these delivery locations
+#                     delivery_location_mappings = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+#                         delivery_location_id__in=delivery_location_ids
+#                     )
+                
+#                     serializer = GetDeliveryLocationMappingDispenserUnitSerializer(delivery_location_mappings, many=True)
+#                     return Response(serializer.data, status=status.HTTP_200_OK)
+#                 except Exception as e:
+#                     return Response({
+#                     "error": f"Error retrieving customer data: {str(e)}"
+#                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+#         else:
+#             return Response({"error": "You are not authorized to get dispenser locations and dispenser gun mapping of POC with user ID"}, status=status.HTTP_403_FORBIDDEN)
+

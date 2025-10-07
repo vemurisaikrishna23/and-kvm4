@@ -44,5 +44,6 @@ urlpatterns = [
     path("delivery-location-mapping-dispenser-unit/get/<int:customer_id>/", GetDeliveryLocationMappingDispenserUnitByCustomerID.as_view(), name="get-delivery-location-mapping-dispenser-unit-by-customer-id"),
     path("delivery-location-mapping-dispenser-unit/edit/<int:id>/", EditDeliveryLocationMappingDispenserUnit.as_view(), name="edit-delivery-location-mapping-dispenser-unit"),
     path("delivery-location-mapping-dispenser-unit/delete/<int:id>/", DeleteDeliveryLocationMappingDispenserUnit.as_view(), name="delete-delivery-location-mapping-dispenser-unit"),
+    # path("dispenser-locations-and-dispenser-gun-mapping-with-user-id/<int:user_id>/", GetDispenserLocationsAndDispenserGunMappingWithUserID.as_view(), name="get-dispenser-locations-and-dispenser-gun-mapping-with-user-id"),
 ]
 
