@@ -1548,16 +1548,6 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
         except DeliveryLocations.DoesNotExist:
             raise serializers.ValidationError("Delivery Location not found")
 
-
-        pending_exists = RequestFuelDispensingDetails.objects.filter(
-            delivery_location_id=delivery_location_id,
-            request_status=0
-        ).order_by('-request_created_at').first()
-
-        if pending_exists:
-            raise serializers.ValidationError("A fuel dispensing request is already pending for this delivery location. Please wait until it completes.")
-
-
         data["delivery_location_name"] = location.name
         if location.customer_id != customer_id:
             raise serializers.ValidationError("Provided customer_id does not match with the delivery location's customer.")
@@ -1661,16 +1651,59 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
             request_created_by=validated_data["user_id"]
         )
 
-        token_source = f"{validated_data['transaction_id']}:{validated_data['dispenser_serialnumber']}"
-        secure_token = salted_hmac("secure_connection", token_source).hexdigest()
+        # token_source = f"{validated_data['transaction_id']}:{validated_data['dispenser_serialnumber']}"
+        # secure_token = salted_hmac("secure_connection", token_source).hexdigest()
 
-        validated_data["secure_token"] = secure_token
+        # validated_data["secure_token"] = secure_token
         return validated_data
 
 
 class GetFuelDispensingRequestsSerializer(serializers.ModelSerializer):
+    DU_Accessible_delivery_locations_details = serializers.SerializerMethodField()
+    class Meta:
+        model = RequestFuelDispensingDetails
+        exclude = ['transaction_log']
+        depth = 1
+
+    def get_DU_Accessible_delivery_locations_details(self, instance):
+        details = []
+        if isinstance(instance.DU_Accessible_delivery_locations, list):
+            for loc_id in instance.DU_Accessible_delivery_locations:
+                try:
+                    location = DeliveryLocations.objects.get(id=loc_id)
+                    details.append({
+                        "id": location.id,
+                        "name": location.name
+                    })
+                except DeliveryLocations.DoesNotExist:
+                    details.append({
+                        "id": loc_id,
+                        "name": f"Unknown Location (ID: {loc_id})"
+                    })
+        return details
+
+
+class GetFuelDispensingRequestsSerializerWithTransactionLog(serializers.ModelSerializer):
+    DU_Accessible_delivery_locations_details = serializers.SerializerMethodField()
+
     class Meta:
         model = RequestFuelDispensingDetails
         fields = '__all__'
         depth = 1
 
+    def get_DU_Accessible_delivery_locations_details(self, instance):
+        details = []
+        if isinstance(instance.DU_Accessible_delivery_locations, list):
+            for loc_id in instance.DU_Accessible_delivery_locations:
+                try:
+                    location = DeliveryLocations.objects.get(id=loc_id)
+                    details.append({
+                        "id": location.id,
+                        "name": location.name
+                    })
+                except DeliveryLocations.DoesNotExist:
+                    details.append({
+                        "id": loc_id,
+                        "name": f"Unknown Location (ID: {loc_id})"
+                    })
+        return details

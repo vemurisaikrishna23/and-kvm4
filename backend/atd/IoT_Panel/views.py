@@ -924,9 +924,6 @@ class CreateRequestForFuelDispensing(APIView):
                     response_data = serializer.save()
                     return Response({
                         "message": "Fuel dispensing request created successfully.",
-                        "transaction_id": response_data.get("transaction_id"),
-                        "token": response_data.get("secure_token"),
-                        "dispenser_serialnumber": response_data.get("dispenser_serialnumber")
                     }, status=status.HTTP_200_OK)
                 except serializers.ValidationError as e:
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1081,7 +1078,7 @@ class GetFuelDispensingRequestsByAssetID(APIView):
             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Fuel Dispensing Requests by ID
+
 class GetFuelDispensingRequestsByID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1090,21 +1087,31 @@ class GetFuelDispensingRequestsByID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
+
         try:
-            requests = RequestFuelDispensingDetails.objects.get(id=id)
+            request_obj = RequestFuelDispensingDetails.objects.get(id=id)
         except RequestFuelDispensingDetails.DoesNotExist:
             return Response({"error": "Fuel Dispensing Request ID not found."}, status=status.HTTP_404_NOT_FOUND)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
-            if 'Accounts Admin' in roles:
-                try:
-                    poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
-                except PointOfContacts.DoesNotExist:
-                    return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
 
-                if requests.customer_id != poc.belong_to_id:
-                    return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
-            requests = RequestFuelDispensingDetails.objects.get(id=id)
-            serializer = GetFuelDispensingRequestsSerializer(requests)
+        if 'IOT Admin' in roles:
+            # Full access
+            serializer = GetFuelDispensingRequestsSerializerWithTransactionLog(request_obj)
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+        elif 'Accounts Admin' in roles:
+            # Check if the logged-in user is mapped to the same customer
+            try:
+                poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+            except PointOfContacts.DoesNotExist:
+                return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
+
+            if request_obj.customer_id != poc.belong_to_id:
+                return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+            serializer = GetFuelDispensingRequestsSerializerWithTransactionLog(request_obj)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
         else:
             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+
