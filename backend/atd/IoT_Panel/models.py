@@ -190,7 +190,7 @@ class RequestFuelDispensingDetails(models.Model):
     transaction_log = models.JSONField(blank=True, null=True, help_text="log of the transaction")
     dispense_end_time = models.DateTimeField(blank=True, null=True, help_text="Fuel Dispense End Time")
     dispense_time_taken = models.FloatField(blank=True, null=True, help_text="Fuel Dispense Time Taken in seconds")
-    dispense_status_code = models.IntegerField(help_text="Fuel Dispenser Status Code")
+    dispense_status_code = models.IntegerField(default=0,help_text="Fuel Dispenser Status Code")
     remarks = models.CharField(max_length=255, blank=True, null=True, help_text="Remarks")
     request_created_at = models.DateTimeField(blank=True, null=True)
     request_updated_at = models.DateTimeField(blank=True, null=True)
