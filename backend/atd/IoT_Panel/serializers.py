@@ -1580,12 +1580,19 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
         if asset.customer_id != data["customer_id"]:
             raise serializers.ValidationError("Asset does not belong to the given customer")
         
-        # Check if this asset is accessible to this delivery location
+        # # Check if this asset is accessible to this delivery location
+        # if not DeliveryLocationAssets.objects.filter(
+        #     delivery_location=delivery_location_id,
+        #     asset_id=asset_id
+        # ).exists():
+        #     raise serializers.ValidationError("This asset is not accessible to the given delivery location.")
+# Check if asset is accessible to delivery_location or DU_Accessible_delivery_locations
+        accessible_locations = [delivery_location_id] + data["DU_Accessible_delivery_locations"]
         if not DeliveryLocationAssets.objects.filter(
-            delivery_location=delivery_location_id,
+            delivery_location__in=accessible_locations,
             asset_id=asset_id
         ).exists():
-            raise serializers.ValidationError("This asset is not accessible to the given delivery location.")
+            raise serializers.ValidationError("This asset is not accessible to the specified delivery location or any of its delivery locations.")
 
 
         data["asset_name"] = asset.name
