@@ -1667,6 +1667,7 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
         validated_data["secure_token"] = secure_token
         return validated_data
 
+
 class GetFuelDispensingRequestsSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequestFuelDispensingDetails
