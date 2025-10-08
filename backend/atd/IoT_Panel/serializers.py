@@ -491,6 +491,9 @@ class GetDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
         depth = 1
 
 
+
+
+
 class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
     dispenser_unit = serializers.PrimaryKeyRelatedField(queryset=DispenserUnits.objects.all(), required=False)
     gun_unit = serializers.PrimaryKeyRelatedField(queryset=GunUnits.objects.all(), required=False)
@@ -1006,6 +1009,129 @@ class DeleteNodeDispenserCustomerMappingSerializer(serializers.Serializer):
     def delete(self, instance):
         instance.delete()
         return instance 
+
+
+
+
+
+
+
+# class GetDispenserGunMappingListByDeliveryLocationIDsSerializer(serializers.Serializer):
+#     delivery_location_ids = serializers.ListField(
+#         child=serializers.IntegerField(),
+#         allow_empty=False
+#     )
+
+#     def validate(self, data):
+#         delivery_location_ids = data.get("delivery_location_ids", [])
+#         user = self.context.get("user")
+#         roles = self.context.get("roles", [])
+
+#         if not delivery_location_ids:
+#             raise serializers.ValidationError("delivery_location_ids is required.")
+
+#         # ✅ 1. Get direct delivery locations
+#         existing_ids = list(
+#             DeliveryLocations.objects.filter(id__in=delivery_location_ids)
+#             .values_list("id", flat=True)
+#         )
+
+#         # ✅ 2. Get delivery_location_ids from DU_Accessible_delivery_locations
+#         accessible_ids = list(
+#             DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+#                 DU_Accessible_delivery_locations__overlap=delivery_location_ids
+#             ).values_list("DU_Accessible_delivery_locations", flat=True)
+#         )
+
+#         # Flatten the nested lists (JSONField returns arrays)
+#         accessible_ids_flat = set()
+#         for sublist in accessible_ids:
+#             accessible_ids_flat.update(sublist)
+
+#         # ✅ 3. Union both sources
+#         found_ids = set(existing_ids) | (set(delivery_location_ids) & accessible_ids_flat)
+
+#         missing_ids = set(delivery_location_ids) - found_ids
+#         if missing_ids:
+#             raise serializers.ValidationError(
+#                 f"Delivery Location IDs not found in main table or DU_Accessible: {', '.join(map(str, missing_ids))}"
+#             )
+
+#         # ✅ 4. Role-based restriction
+#         if "IOT Admin" in roles:
+#             return data
+
+#         # For non-admins, ensure they own these delivery locations
+#         for dl_id in found_ids:
+#             try:
+#                 dl_obj = DeliveryLocations.objects.get(id=dl_id)
+#                 if dl_obj.customer_id != user.customer_id:
+#                     raise serializers.ValidationError(
+#                         f"You do not have access to Delivery Location ID {dl_id}."
+#                     )
+#             except DeliveryLocations.DoesNotExist:
+#                 continue  # If not in direct table, skip access check (already counted above)
+
+#         return data
+
+
+class GetDispenserGunMappingListByDeliveryLocationIDsSerializer(serializers.Serializer):
+    delivery_location_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )
+
+    def validate(self, data):
+        delivery_location_ids = data.get("delivery_location_ids", [])
+        user = self.context.get("user")
+        roles = self.context.get("roles", [])
+
+        if not delivery_location_ids:
+            raise serializers.ValidationError("delivery_location_ids is required.")
+
+        # ✅ 1. Check that all IDs exist in DeliveryLocations or DU_Accessible
+        existing_ids = list(
+            DeliveryLocations.objects.filter(id__in=delivery_location_ids).values_list("id", flat=True)
+        )
+
+        accessible_ids = list(
+            DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+                DU_Accessible_delivery_locations__overlap=delivery_location_ids
+            ).values_list("DU_Accessible_delivery_locations", flat=True)
+        )
+
+        accessible_ids_flat = set()
+        for sublist in accessible_ids:
+            accessible_ids_flat.update(sublist)
+
+        found_ids = set(existing_ids) | (set(delivery_location_ids) & accessible_ids_flat)
+        missing_ids = set(delivery_location_ids) - found_ids
+        if missing_ids:
+            raise serializers.ValidationError(
+                f"Delivery Location IDs not found: {', '.join(map(str, missing_ids))}"
+            )
+
+        # ✅ 2. If IoT Admin → allow all
+        if "IOT Admin" in roles:
+            return data
+
+        # ✅ 3. For other roles: check customer ownership
+        user_customer_ids = PointOfContacts.objects.filter(
+            user_id=user.id,
+            belong_to_type="customer"
+        ).values_list("belong_to_id", flat=True)
+
+        for dl_id in found_ids:
+            try:
+                dl_obj = DeliveryLocations.objects.get(id=dl_id)
+                if dl_obj.customer_id not in user_customer_ids:
+                    raise serializers.ValidationError(
+                        f"You are not authorized to access Delivery Location ID {dl_id} (belongs to another customer)."
+                    )
+            except DeliveryLocations.DoesNotExist:
+                continue
+
+        return data
 
 
 

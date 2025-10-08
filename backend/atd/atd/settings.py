@@ -82,28 +82,7 @@ WSGI_APPLICATION = 'atd.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
-
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "atd_database",
-#         "USER": "myaccess",
-#         "PASSWORD": "myaccess",
-#         "HOST": "38.242.216.156",
-#         "PORT": "3306",
-#         "OPTIONS": {
-#             "charset": "utf8mb4",
-#             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-#         },  
-#     }
-# }
 
 DATABASES = {
     "default": {
@@ -111,7 +90,8 @@ DATABASES = {
         "NAME": "atd_uat_db",
         "USER": "iotjaideep",
         "PASSWORD": "k8P3x7M1s4",
-        "HOST": "Atd-iot-db.coh7dtk0kjb8.ap-south-1.rds.amazonaws.com",
+        # "HOST": "Atd-iot-db.coh7dtk0kjb8.ap-south-1.rds.amazonaws.com",
+        "HOST": "65.1.231.95",
         "PORT": "3306",
         "OPTIONS": {
             "charset": "utf8mb4",

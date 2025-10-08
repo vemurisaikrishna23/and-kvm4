@@ -74,6 +74,13 @@ class NodeUnits(models.Model):
 
 
 class Dispenser_Gun_Mapping_To_Customer(models.Model):
+    Machine_Status = [
+        (1, 'Idle'),
+        (0, 'Offline'),
+        (2, 'Dispensing'),
+        (3, 'Allocated'),
+        (4, 'Error'),
+    ]
     id = models.BigAutoField(primary_key=True)
     dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE)
     gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE)
@@ -88,6 +95,8 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
     gps_coordinates = models.JSONField(blank=True, null=True, help_text="Live GPS coordinates as JSON: {'lat': ..., 'lon': ...}")
     assigned_status = models.BooleanField(default=True, help_text="Whether this unit is currently with customer or not")
     status = models.BooleanField(default=True, help_text="to stop controls to the customer")
+    machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
+    connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
     remarks = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
