@@ -45,6 +45,12 @@ urlpatterns = [
     path("delivery-location-mapping-dispenser-unit/get/<int:customer_id>/", GetDeliveryLocationMappingDispenserUnitByCustomerID.as_view(), name="get-delivery-location-mapping-dispenser-unit-by-customer-id"),
     path("delivery-location-mapping-dispenser-unit/edit/<int:id>/", EditDeliveryLocationMappingDispenserUnit.as_view(), name="edit-delivery-location-mapping-dispenser-unit"),
     path("delivery-location-mapping-dispenser-unit/delete/<int:id>/", DeleteDeliveryLocationMappingDispenserUnit.as_view(), name="delete-delivery-location-mapping-dispenser-unit"),
-    # path("dispenser-locations-and-dispenser-gun-mapping-with-user-id/<int:user_id>/", GetDispenserLocationsAndDispenserGunMappingWithUserID.as_view(), name="get-dispenser-locations-and-dispenser-gun-mapping-with-user-id"),
+
+    path("request-fuel-dispensing/create/", CreateRequestForFuelDispensing.as_view(), name="create-request-for-fuel-dispensing"),
+    path("request-fuel-dispensing/get/", GetFuelDispensingRequests.as_view(), name="get-all-fuel-dispensing-requests"),
+    path("request-fuel-dispensing/get/customer_id/<int:customer_id>/", GetFuelDispensingRequestsByCustomerID.as_view(), name="get-fuel-dispensing-requests-by-customer-id"),
+    path("request-fuel-dispensing/get/dispenser_gun_mapping_id/<int:dispenser_gun_mapping_id>/", GetFuelDispensingRequestsByDispenserGunMappingID.as_view(), name="get-fuel-dispensing-requests-by-dispenser-gun-mapping-id"),
+    path("request-fuel-dispensing/get/delivery_location_id/<int:delivery_location_id>/", GetFuelDispensingRequestsByDeliveryLocationID.as_view(), name="get-fuel-dispensing-requests-by-delivery-location-id"),
+    path("request-fuel-dispensing/get/asset_id/<int:asset_id>/", GetFuelDispensingRequestsByAssetID.as_view(), name="get-fuel-dispensing-requests-by-asset-id"),
 ]
 

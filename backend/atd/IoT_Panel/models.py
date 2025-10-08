@@ -148,3 +148,52 @@ class DeliveryLocation_Mapping_DispenserUnit(models.Model):
         verbose_name_plural = "Delivery Location Mappings"
 
 
+class RequestFuelDispensingDetails(models.Model):
+    Request_Status = [
+        (0, 'Pending'),
+        (1, 'Completed'),
+        (2, 'Failed'),
+    ]
+    Request_Type = [
+        (0, 'Volume'),
+        (1, 'Amount'),
+    ]
+    id = models.BigAutoField(primary_key=True)
+    user_id = models.BigIntegerField(help_text="User ID of who is requesting the fuel dispensing")
+    user_name = models.CharField(max_length=255,blank=True,null=True, help_text="User Name")
+    user_email = models.EmailField(blank=True,null=True, help_text="User Email")
+    user_phone = models.CharField(max_length=255,blank=True,null=True, help_text="User Phone")
+    dispenser_gun_mapping_id = models.BigIntegerField(help_text="Dispenser Gun Mapping ID")
+    dispenser_serialnumber = models.CharField(max_length=255, help_text="Dispenser Unit Serial Number")
+    dispenser_imeinumber = models.CharField(max_length=255, help_text="Dispenser Unit IMEI Number")
+    delivery_location_id = models.BigIntegerField(help_text="Delivery Location ID of the dispenser unit")
+    delivery_location_name = models.CharField(max_length=255, help_text="Delivery Location Name")
+    DU_Accessible_delivery_locations = models.JSONField(default=list,blank=True,null=True,help_text="list of delivery location IDs which are accessible to the selected dispenser unit")
+    customer_id = models.BigIntegerField(help_text="Customer ID")
+    customer_name = models.CharField(max_length=255, help_text="Customer Name")
+    customer_email = models.EmailField(blank=True,null=True, help_text="Customer Email")
+    customer_phone = models.CharField(max_length=255,blank=True,null=True, help_text="Customer Phone")
+    asset_id = models.BigIntegerField(help_text="Asset ID")
+    asset_name = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Name")
+    asset_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag ID")
+    asset_tag_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag Type")
+    asset_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Type")
+    transaction_id = models.CharField(max_length=255, help_text="Transaction ID")
+    dispenser_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Volume")
+    dispenser_price = models.FloatField(blank=True,null=True, help_text="Dispenser Price")
+    dispenser_live_price = models.FloatField(blank=True,null=True, help_text="Dispenser Live Price")
+    request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
+    request_status = models.IntegerField(default=0, choices=Request_Status, help_text="Request Status")
+    fuel_state = models.BooleanField(default=False)
+    transaction_log = models.JSONField(blank=True, null=True, help_text="log of the transaction")
+    remarks = models.CharField(max_length=255, blank=True, null=True, help_text="Remarks")
+    request_created_at = models.DateTimeField(blank=True, null=True)
+    request_updated_at = models.DateTimeField(blank=True, null=True)
+    request_created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    request_updated_by = models.PositiveBigIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "request_fuel_dispensing_details"
+        verbose_name = "Request Fuel Dispensing Details"
+        verbose_name_plural = "Request Fuel Dispensing Details"
+

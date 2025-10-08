@@ -5,6 +5,9 @@ from existing_tables.models import *
 from .models import *
 from django.utils import timezone
 from django.db import transaction
+import random
+import string
+from django.utils.crypto import salted_hmac
 
 class LoginSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=255)
@@ -1493,4 +1496,180 @@ class DeleteDeliveryLocationMappingDispenserUnitSerializer(serializers.Serialize
     def delete(self, instance):
         instance.delete()
         return instance
+
+
+class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    delivery_location_id = serializers.IntegerField()
+    customer_id = serializers.IntegerField()
+    asset_id = serializers.IntegerField()
+    request_type = serializers.ChoiceField(choices=[0, 1])  # 0: Volume, 1: Amount
+    dispenser_volume = serializers.FloatField(required=False)
+    dispenser_price = serializers.FloatField(required=False)
+    remarks = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        user = self.context.get("user")
+        login_user_id = getattr(user, "id", None)
+
+        user_id = data.get("user_id")
+        delivery_location_id = data.get("delivery_location_id")
+        customer_id = data.get("customer_id")
+        asset_id = data.get("asset_id")
+        request_type = data.get("request_type")
+        dispenser_volume = data.get("dispenser_volume")
+        dispenser_price = data.get("dispenser_price")
+
+        # 1. Validate user
+        try:
+            user_obj = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            raise serializers.ValidationError("Invalid user_id")
+
+        if login_user_id != user_id:
+            raise serializers.ValidationError("Logged-in user does not match the given user_id")
+
+        data["user_name"] = user_obj.name
+        data["user_email"] = user_obj.email
+        data["user_phone"] = user_obj.mobile
+
+        # 2. Validate delivery_location
+        try:
+            mapping = DeliveryLocation_Mapping_DispenserUnit.objects.get(delivery_location_id=delivery_location_id)
+        except DeliveryLocation_Mapping_DispenserUnit.DoesNotExist:
+            raise serializers.ValidationError("Invalid delivery_location_id")
+
+        dispenser_map_id = mapping.dispenser_gun_mapping_id.id
+        data["dispenser_gun_mapping_id"] = dispenser_map_id
+        data["DU_Accessible_delivery_locations"] = mapping.DU_Accessible_delivery_locations
+
+        try:
+            location = DeliveryLocations.objects.get(id=delivery_location_id)
+        except DeliveryLocations.DoesNotExist:
+            raise serializers.ValidationError("Delivery Location not found")
+
+
+        pending_exists = RequestFuelDispensingDetails.objects.filter(
+            delivery_location_id=delivery_location_id,
+            request_status=0
+        ).order_by('-request_created_at').first()
+
+        if pending_exists:
+            raise serializers.ValidationError("A fuel dispensing request is already pending for this delivery location. Please wait until it completes.")
+
+
+        data["delivery_location_name"] = location.name
+        if location.customer_id != customer_id:
+            raise serializers.ValidationError("Provided customer_id does not match with the delivery location's customer.")
+        customer = Customers.objects.get(id=customer_id)
+        data["customer_id"] = customer.id
+        data["customer_name"] = customer.name
+        data["customer_email"] = customer.email
+        data["customer_phone"] = customer.mobile
+
+        try:
+            dispenser = Dispenser_Gun_Mapping_To_Customer.objects.get(id=dispenser_map_id)
+        except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+            raise serializers.ValidationError("Dispenser mapping not found")
+
+        try:
+            dispenser_unit = DispenserUnits.objects.get(id=dispenser.dispenser_unit.id)
+        except DispenserUnits.DoesNotExist:
+            raise serializers.ValidationError("Dispenser unit not found")
+
+        data["dispenser_serialnumber"] = dispenser_unit.serial_number
+        data["dispenser_imeinumber"] = dispenser_unit.imei_number
+
+
+        # 3. Validate asset
+        try:
+            asset = Assets.objects.get(id=asset_id)
+        except Assets.DoesNotExist:
+            raise serializers.ValidationError("Invalid asset_id")
+
+        if asset.customer_id != data["customer_id"]:
+            raise serializers.ValidationError("Asset does not belong to the given customer")
+        
+        # Check if this asset is accessible to this delivery location
+        if not DeliveryLocationAssets.objects.filter(
+            delivery_location=delivery_location_id,
+            asset_id=asset_id
+        ).exists():
+            raise serializers.ValidationError("This asset is not accessible to the given delivery location.")
+
+
+        data["asset_name"] = asset.name
+        data["asset_tag_id"] = asset.tag_id
+        data["asset_tag_type"] = asset.tag_type
+        data["asset_type"] = asset.type
+
+        # 4. Generate unique transaction_id
+        while True:
+            txn_id = "TXN" + str(random.randint(100000000000, 999999999999))
+            if not RequestFuelDispensingDetails.objects.filter(transaction_id=txn_id).exists():
+                break
+        data["transaction_id"] = txn_id
+
+        # 5. Validate request_type logic
+        if request_type == 0:  # Volume
+            if dispenser_volume is None:
+                raise serializers.ValidationError("dispenser_volume is required when request_type is by Volume")
+            data["dispenser_volume"] = dispenser_volume
+            data["dispenser_price"] = 0.0
+        else:  # Amount
+            if dispenser_price is None:
+                raise serializers.ValidationError("dispenser_price is required when request_type is by Amount")
+            data["dispenser_price"] = dispenser_price
+            data["dispenser_volume"] = 0.0
+
+        return data
+
+    def create(self, validated_data):
+
+        remarks = validated_data.get("remarks", "")
+
+        RequestFuelDispensingDetails.objects.create(
+            user_id=validated_data["user_id"],
+            user_name=validated_data["user_name"],
+            user_email=validated_data["user_email"],
+            user_phone=validated_data["user_phone"],
+            dispenser_gun_mapping_id=validated_data["dispenser_gun_mapping_id"],
+            dispenser_serialnumber=validated_data["dispenser_serialnumber"],
+            dispenser_imeinumber=validated_data["dispenser_imeinumber"],
+            delivery_location_id=validated_data["delivery_location_id"],
+            delivery_location_name=validated_data["delivery_location_name"],
+            DU_Accessible_delivery_locations=validated_data["DU_Accessible_delivery_locations"],
+            customer_id=validated_data["customer_id"],
+            customer_name=validated_data["customer_name"],
+            customer_email=validated_data["customer_email"],
+            customer_phone=validated_data["customer_phone"],
+            asset_id=validated_data["asset_id"],
+            asset_name=validated_data["asset_name"],
+            asset_tag_id=validated_data["asset_tag_id"],
+            asset_tag_type=validated_data["asset_tag_type"],
+            asset_type=validated_data["asset_type"],
+            transaction_id=validated_data["transaction_id"],
+            dispenser_volume=validated_data["dispenser_volume"],
+            dispenser_price=validated_data["dispenser_price"],
+            dispenser_live_price=0.0,
+            request_type=validated_data["request_type"],
+            request_status=0,
+            fuel_state=False,
+            transaction_log={},
+            remarks=remarks,
+            request_created_at=timezone.now(),
+            request_created_by=validated_data["user_id"]
+        )
+
+        token_source = f"{validated_data['transaction_id']}:{validated_data['dispenser_serialnumber']}"
+        secure_token = salted_hmac("secure_connection", token_source).hexdigest()
+
+        validated_data["secure_token"] = secure_token
+        return validated_data
+
+class GetFuelDispensingRequestsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RequestFuelDispensingDetails
+        fields = '__all__'
+        depth = 1
 

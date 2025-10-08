@@ -528,35 +528,6 @@ class GetDispenserGunMappingToCustomerByCustomerID(APIView):
         else:
             return Response({"error": "You are not authorized to get dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
-#Get Dispenser Gun Mapping List by Delivery Location ID's
-class GetDispenserGunMappingListByDeliveryLocationIDs(APIView):
-    renderer_classes = [IoT_PanelRenderer]
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, format=None):
-        user = request.user
-        user_id = getattr(user, "id", None)
-        roles = get_user_roles(user_id)
-
-        try:
-            serializer = GetDispenserGunMappingListByDeliveryLocationIDsSerializer(
-                data=request.data,
-                context={"roles": roles, "user": user}
-            )
-            serializer.is_valid(raise_exception=True)
-            delivery_location_ids = serializer.validated_data["delivery_location_ids"]
-
-            mappings = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
-                Q(delivery_location_id__in=delivery_location_ids) |
-                Q(DU_Accessible_delivery_locations__contains=delivery_location_ids) |
-                Q(DU_Accessible_delivery_locations__overlap=delivery_location_ids)
-            ).distinct()
-
-            result_serializer = GetDeliveryLocationMappingDispenserUnitSerializer(mappings, many=True)
-            return Response(result_serializer.data, status=200)
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
 
 
 
@@ -849,7 +820,39 @@ class GetDeliveryLocationMappingDispenserUnitByCustomerID(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
-            
+
+
+#Get Dispenser Gun Mapping List by Delivery Location ID's
+class GetDispenserGunMappingListByDeliveryLocationIDs(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        try:
+            serializer = GetDispenserGunMappingListByDeliveryLocationIDsSerializer(
+                data=request.data,
+                context={"roles": roles, "user": user}
+            )
+            serializer.is_valid(raise_exception=True)
+            delivery_location_ids = serializer.validated_data["delivery_location_ids"]
+
+            mappings = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+                Q(delivery_location_id__in=delivery_location_ids) |
+                Q(DU_Accessible_delivery_locations__contains=delivery_location_ids) |
+                Q(DU_Accessible_delivery_locations__overlap=delivery_location_ids)
+            ).distinct()
+
+            result_serializer = GetDeliveryLocationMappingDispenserUnitSerializer(mappings, many=True)
+            return Response(result_serializer.data, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+
 #Edit Delivery Location Mapping Dispenser Unit
 class EditDeliveryLocationMappingDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -901,3 +904,178 @@ class DeleteDeliveryLocationMappingDispenserUnit(APIView):
             return Response({"error": "You are not authorized to delete a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
+
+class CreateRequestForFuelDispensing(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        try:
+            serializer = CreateRequestForFuelDispensingSerializer(
+                data=request.data,
+                context={"roles": roles, "user": user}
+            )
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    response_data = serializer.save()
+                    return Response({
+                        "message": "Fuel dispensing request created successfully.",
+                        "transaction_id": response_data.get("transaction_id"),
+                        "token": response_data.get("secure_token"),
+                        "dispenser_serialnumber": response_data.get("dispenser_serialnumber")
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+#Get Fuel Dispensing Requests
+class GetFuelDispensingRequests(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.all()
+            serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get fuel dispensing requests"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Fuel Dispensing Requests by Customer ID
+class GetFuelDispensingRequestsByCustomerID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+
+            if 'Accounts Admin' in roles:
+                # Accounts Admin can fetch only their associated customer's data
+                try:
+                    poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+                    if str(poc.belong_to_id) != str(customer_id):
+                        return Response(
+                            {"error": "You are not authorized to view this customer's fuel dispensing requests."},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                except PointOfContacts.DoesNotExist:
+                    return Response(
+                        {"error": "User is not associated with any customer."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            # Passed validation
+            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
+            serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        else:
+            return Response(
+                {"error": "You are not authorized to get fuel dispensing requests."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+#Get Fuel Dispensing Requests by Dispenser Gun Mapping ID
+class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, dispenser_gun_mapping_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        try:
+            dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=dispenser_gun_mapping_id)
+        except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
+            return Response({"error": "Dispenser Gun Mapping ID not found."}, status=status.HTTP_404_NOT_FOUND)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            if 'Accounts Admin' in roles:
+                try:
+                    poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+                except PointOfContacts.DoesNotExist:
+                    return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
+
+                if dispenser_mapping.customer != poc.belong_to_id:
+                    return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
+
+            requests = RequestFuelDispensingDetails.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id)
+            serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        else:
+            return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Fuel Dispensing Requests by Delivery Location ID
+class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, delivery_location_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        try:
+            delivery_location = DeliveryLocations.objects.get(id=delivery_location_id)
+        except DeliveryLocations.DoesNotExist:
+            return Response({"error": "Delivery Location ID not found."}, status=status.HTTP_404_NOT_FOUND)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            if 'Accounts Admin' in roles:
+                try:
+                    poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+                except PointOfContacts.DoesNotExist:
+                    return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
+
+                if delivery_location.customer_id != poc.belong_to_id:
+                    return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
+
+            requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id)
+            serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Fuel Dispensing Requests by Asset ID
+class GetFuelDispensingRequestsByAssetID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, asset_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        try:
+            asset = Assets.objects.get(id=asset_id)
+        except Assets.DoesNotExist:
+            return Response({"error": "Asset ID not found."}, status=status.HTTP_404_NOT_FOUND)
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+            if 'Accounts Admin' in roles:
+                try:
+                    poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+                except PointOfContacts.DoesNotExist:
+                    return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
+
+                if asset.customer_id != poc.belong_to_id:
+                    return Response({"error": "You are not authorized to access this asset's data."}, status=status.HTTP_403_FORBIDDEN)
+
+            requests = RequestFuelDispensingDetails.objects.filter(asset_id=asset_id)
+            serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
