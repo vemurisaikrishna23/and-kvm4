@@ -33,6 +33,7 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'channels',
 
 
     'existing_tables',
@@ -76,7 +78,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'atd.wsgi.application'
+# WSGI_APPLICATION = 'atd.wsgi.application'
+ASGI_APPLICATION = 'atd.asgi.application'
 
 
 # Database
@@ -149,6 +152,16 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
        'IoT_Panel.auth.ExistingUsersJWTAuthentication',
     )
+}
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('192.210.241.34', 6379)],
+        },
+    },
 }
 
 SIMPLE_JWT = {
