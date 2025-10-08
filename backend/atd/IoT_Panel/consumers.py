@@ -35,3 +35,6 @@ class EchoBroadcastConsumer(AsyncWebsocketConsumer):
 
     async def chat_bytes(self, event):
         await self.send(bytes_data=event["bytes"])
+
+
+

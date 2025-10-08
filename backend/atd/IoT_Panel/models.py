@@ -182,6 +182,8 @@ class RequestFuelDispensingDetails(models.Model):
     dispenser_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Volume")
     dispenser_price = models.FloatField(blank=True,null=True, help_text="Dispenser Price")
     dispenser_live_price = models.FloatField(blank=True,null=True, help_text="Dispenser Live Price")
+    dispenser_received_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Received Volume")
+    dispenser_received_price = models.FloatField(blank=True,null=True, help_text="Dispenser Received Price")
     request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
     request_status = models.IntegerField(default=0, choices=Request_Status, help_text="Request Status")
     fuel_state = models.BooleanField(default=False)
