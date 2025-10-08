@@ -53,5 +53,6 @@ urlpatterns = [
     path("request-fuel-dispensing/get/delivery_location_id/<int:delivery_location_id>/", GetFuelDispensingRequestsByDeliveryLocationID.as_view(), name="get-fuel-dispensing-requests-by-delivery-location-id"),
     path("request-fuel-dispensing/get/asset_id/<int:asset_id>/", GetFuelDispensingRequestsByAssetID.as_view(), name="get-fuel-dispensing-requests-by-asset-id"),
     path("request-fuel-dispensing/get/id/<int:id>/", GetFuelDispensingRequestsByID.as_view(), name="get-fuel-dispensing-requests-by-id"),
+    path("request-fuel-dispensing/get/user_id/<int:user_id>/", GetFuelDispensingRequestsByUserID.as_view(), name="get-fuel-dispensing-requests-by-user-id"),
 ]
 
