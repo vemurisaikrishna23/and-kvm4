@@ -82,6 +82,9 @@ TEMPLATES = [
 ASGI_APPLICATION = 'atd.asgi.application'
 
 
+
+MY_SHARED_SECRET_KEY = "atd_shared_secret_key"
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 

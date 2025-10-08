@@ -1,40 +1,78 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
+import json
+from asgiref.sync import async_to_sync
+from urllib.parse import parse_qs
+from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
+import os
+import django
+from asgiref.sync import sync_to_async
+from datetime import datetime
+from pytz import timezone 
+import base64, time
 
-BROADCAST_GROUP = "broadcast"
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'atd.settings')
+django.setup()
 
-class EchoBroadcastConsumer(AsyncWebsocketConsumer):
+
+# ---------- Token Verification Helpers ----------
+def xor_with_key(data: bytes, key: str) -> bytes:
+    key_bytes = key.encode()
+    return bytes([b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(data)])
+
+def digit_sum(imei: str) -> int:
+    return sum(int(ch) for ch in imei)
+
+def checksum_twos(imei: str) -> int:
+    s = digit_sum(imei) & 0xFF
+    return (-s) & 0xFF
+
+def verify_token(token: str, key: str):
+    try:
+        decrypted = xor_with_key(base64.b64decode(token), key).decode()
+        imei, chk, ts = decrypted.split("|")
+        expected_chk = checksum_twos(imei)
+        return expected_chk == int(chk), {"imei": imei, "checksum": chk, "timestamp": int(ts)}
+    except Exception:
+        return False, {}
+
+
+class DispenserControlConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        await self.accept()
-        await self.channel_layer.group_add(BROADCAST_GROUP, self.channel_name)
+        query_string = self.scope['query_string'].decode('utf8')
+        query_params = parse_qs(query_string)
+
+        imei_number = query_params.get('imei_number', [None])[0]
+        token = query_params.get('token', [None])[0]
+        self.room_id = f"room_{self.imei_number}"
+
+        is_valid = await self.verify_token_and_match_imei(token, imei_number)
+
+        if is_valid:
+            await self.channel_layer.group_add(
+            self.room_id,
+            self.channel_name
+        )
+            await self.accept()
+        else:
+            await self.close(code=4001)
+            return
+
+        # Add to group and accept connection
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(BROADCAST_GROUP, self.channel_name)
+        await self.channel_layer.group_discard(
+            self.room_id,
+            self.channel_name
+        )
 
-    async def receive(self, text_data=None, bytes_data=None):
-        """
-        Forwards the payload EXACTLY as received to all clients.
-        - If text frame: forwards the same text string
-        - If binary frame: forwards the same bytes
-        """
-        if text_data is not None:
-            # (Optional) quick sanity check for JSON without changing formatting:
-            # If you want to ensure valid JSON but still keep original text:
-            # import json; json.loads(text_data)  # will raise if invalid
-            await self.channel_layer.group_send(
-                BROADCAST_GROUP,
-                {"type": "chat.text", "text": text_data},
-            )
-        elif bytes_data is not None:
-            await self.channel_layer.group_send(
-                BROADCAST_GROUP,
-                {"type": "chat.bytes", "bytes": bytes_data},
-            )
+    @sync_to_async
+    def verify_token_and_match_imei(self, token: str, given_imei: str) -> bool:
+        key = "atd_shared_secret_key"
+        valid, token_imei = verify_token(token, key)
 
-    async def chat_text(self, event):
-        await self.send(text_data=event["text"])
+        return valid and token_imei == given_imei
 
-    async def chat_bytes(self, event):
-        await self.send(bytes_data=event["bytes"])
 
 
 
