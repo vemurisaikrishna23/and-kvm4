@@ -96,9 +96,46 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None, bytes_data=None):
         """
-        Forwards the payload to all connected clients in the same room except sender.
+        Receives JSON payload from sender, validates structure, performs logic,
+        and then forwards to all other clients in the room (excluding sender).
         """
         if text_data is not None:
+            try:
+                data = json.loads(text_data)
+            except json.JSONDecodeError:
+                await self.send_error_message("Invalid JSON format")
+                return
+
+            # Mandatory fields check
+            if "type" not in data or "machine" not in data:
+                await self.send_error_message("Payload must include 'type' and 'machine'")
+                return
+
+            machine = data["machine"]
+            msg_type = data["type"]
+
+            if machine not in ["hardware", "web"]:
+                await self.send_error_message("Invalid machine type. Allowed: 'hardware', 'web'")
+                return
+
+            if machine == "hardware":
+                if msg_type == 4:
+                    imei = data.get("imei")
+                    status = data.get("status")
+
+                    if imei is None or status is None:
+                        await self.send_error_message("IMEI and status are required")
+                        return
+                    
+                    try:
+                        int_status = int(status)
+                    except ValueError:
+                        await self.send_error_message("Status must be an integer-compatible value")
+                        return
+                    print(f"[HARDWARE MESSAGE] Received from IMEI {imei}: {status}")
+                    await self.update_machine_status(imei, status)
+
+            # Forward to group (excluding sender)
             await self.channel_layer.group_send(
                 self.room_id,
                 {
@@ -107,6 +144,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     "sender_channel_name": self.channel_name,
                 },
             )
+
         elif bytes_data is not None:
             await self.channel_layer.group_send(
                 self.room_id,
@@ -116,6 +154,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     "sender_channel_name": self.channel_name,
                 },
             )
+        
 
 
     async def dispenser_text(self, event):
@@ -182,5 +221,25 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         ).update(connectivity_status=(status == "online"))
 
         print(f"[STATUS] IMEI {imei} updated to {status}")
+
+
+    @database_sync_to_async
+    def update_machine_status(self, imei: str, status: str):
+        """
+        Update the machine_status field in Dispenser_Gun_Mapping_To_Customer
+        for the dispenser unit with the given IMEI.
+        """
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+            affected = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                dispenser_unit_id=dispenser.id
+            ).update(machine_status=status)
+
+            print(f"[MACHINE STATUS] Updated {affected} mapping(s) for IMEI {imei} to status {status}")
+
+        except DispenserUnits.DoesNotExist:
+            print(f"[ERROR] IMEI {imei} not found in DispenserUnits for machine status update")
+
+
 
 
