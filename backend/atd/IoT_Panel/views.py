@@ -924,11 +924,13 @@ class CreateRequestForFuelDispensing(APIView):
                     response_data = serializer.save()
                     return Response({
                         "message": "Fuel dispensing request created successfully.",
-                        "data": {"transaction_id": response_data.transaction_id}
+                        "data": {"transaction_id": response_data.get("transaction_id")}
                     }, status=status.HTTP_200_OK)
                 except serializers.ValidationError as e:
+                    print("error", e)
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            print("error123", e)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
