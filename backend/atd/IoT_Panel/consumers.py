@@ -121,7 +121,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             if machine == "hardware":
                 if msg_type == 4:
                     imei = data.get("imei")
-                    status = data.get("status")
+                    status = data.get("mstatus")
 
                     if imei is None or status is None:
                         await self.send_error_message("IMEI and status are required")
