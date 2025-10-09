@@ -159,6 +159,56 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         await self.update_price_fields(imei, volume_val, money_val, price_val)
                     else:
                         print(f"[SKIP PRICE UPDATE] Status = {price_status}")
+                elif msg_type == 31:
+                    required_fields = [
+                        "imei", "time_utc", "lat", "lon", "alt_m", 
+                        "sats_used", "speed_kmh", "course_deg", "has_fix",
+                        "gvr_volume", "gvr_money", "gvr_ppu_level1", "gvr_ppu_level2"
+                    ]
+
+                    missing_fields = [field for field in required_fields if field not in data]
+                    if missing_fields:
+                        await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
+                        return
+
+                    try:
+                        imei = data["imei"]
+                        print(data["lat"], data["lon"], data["alt_m"])
+                        if data["lat"] == None:
+                            data["lat"] = 0.0
+                        if data["lon"] == None:
+                            data["lon"] = 0.0
+                        if data["alt_m"] == None:
+                            data["alt_m"] = 0.0
+
+                        gps_data = {
+                            "time_utc": str(data["time_utc"]),
+                            "lat": float(data["lat"]),
+                            "lon": float(data["lon"]),
+                            "alt_m": float(data["alt_m"]),
+                            "sats_used": int(data["sats_used"]),
+                            "speed_kmh": float(data["speed_kmh"]),
+                            "course_deg": float(data["course_deg"]),
+                        }
+                        has_fix = bool(data["has_fix"])
+                        gvr_volume = int(data["gvr_volume"])
+                        gvr_money = int(data["gvr_money"])
+                        gvr_ppu_level1 = int(data["gvr_ppu_level1"])
+
+                    except (ValueError, TypeError, KeyError) as e:
+                        await self.send_error_message(f"Field type conversion error: {e}")
+                        return
+
+                    print(f"[GPS + LIVE] IMEI={imei}, FIX={has_fix}, VOL={gvr_volume}, ₹={gvr_money}, PPU={gvr_ppu_level1}")
+
+                    await self.update_gps_coordinates(imei, gps_data, has_fix)
+                    await self.update_price_fields(
+                        imei=imei,
+                        totalizer_reading=gvr_volume / 100.0,
+                        amount=gvr_money,
+                        live_price=gvr_ppu_level1
+                    )
+
                 else:
                     pass
 
@@ -283,4 +333,29 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print(f"[ERROR] IMEI {imei} not found for price update")
 
 
+    @database_sync_to_async
+    def update_gps_coordinates(self, imei, gps_data: dict, has_fix: bool):
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+            dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(dispenser_unit=dispenser)
+            current_gps = dispenser_mapping.gps_coordinates or {}
+
+            if has_fix:
+                # Valid GPS fix → update all with live_data=True
+                gps_data["live_data"] = True
+                dispenser_mapping.gps_coordinates = gps_data
+            else:
+                # No fix: retain previous, update live_data to False
+                if current_gps:
+                    current_gps["live_data"] = False
+                    dispenser_mapping.gps_coordinates = current_gps
+                else:
+                    gps_data["live_data"] = False
+                    dispenser_mapping.gps_coordinates = gps_data
+
+            dispenser_mapping.save(update_fields=["gps_coordinates"])
+            print(f"[GPS UPDATED] IMEI={imei}, live_data={dispenser_mapping.gps_coordinates['live_data']}")
+
+        except DispenserUnits.DoesNotExist:
+            print(f"[ERROR] Dispenser with IMEI {imei} not found for GPS update")
 
