@@ -42,12 +42,13 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         query_string = self.scope['query_string'].decode('utf8')
         query_params = parse_qs(query_string)
 
-        imei_number = query_params.get('imei_number', [None])[0]
-        token = query_params.get('token', [None])[0]
+        self.imei_number = query_params.get('imei_number', [None])[0]
+        self.token = query_params.get('token', [None])[0]
         self.room_id = f"room_{self.imei_number}"
+        print(self.imei_number, self.token)
 
-        is_valid = await self.verify_token_and_match_imei(token, imei_number)
-
+        is_valid = await self.verify_token_and_match_imei(self.token, self.imei_number)
+        print(is_valid)
         if is_valid:
             await self.channel_layer.group_add(
             self.room_id,
@@ -69,9 +70,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
     @sync_to_async
     def verify_token_and_match_imei(self, token: str, given_imei: str) -> bool:
         key = "atd_shared_secret_key"
-        valid, token_imei = verify_token(token, key)
-
-        return valid and token_imei == given_imei
+        valid, data = verify_token(token, key)
+        print(valid, data)
+        return valid and data.get("imei") == given_imei
 
 
 

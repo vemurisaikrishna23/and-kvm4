@@ -1180,6 +1180,14 @@ class AddDeliveryLocationMappingDispenserUnitSerializer(serializers.ModelSeriali
                 dispenser_gun_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=dispenser_gun_mapping_id)
                 customer_id = dispenser_gun_mapping.customer
                 
+                poc = PointOfContacts.objects.filter(
+                    user_id=self.context["user"].id,
+                    belong_to_type="customer"
+                ).first()
+
+                if not poc or poc.belong_to_id != customer_id:
+                    raise serializers.ValidationError("You are not authorized to assign this dispenser gun mapping. It belongs to a different customer.")
+
                 # Check if the delivery location belongs to this customer
                 if not DeliveryLocations.objects.filter(id=delivery_location_id, customer=customer_id).exists():
                     raise serializers.ValidationError("You can only add delivery locations that belong to your customer.")
