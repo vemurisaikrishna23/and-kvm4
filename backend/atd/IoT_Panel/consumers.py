@@ -12,6 +12,8 @@ from pytz import timezone
 import base64, time
 from .models import *
 from existing_tables.models import *
+from django.utils import timezone as dj_timezone
+from datetime import datetime
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'atd.settings')
 django.setup()
@@ -208,6 +210,48 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         amount=gvr_money,
                         live_price=gvr_ppu_level1
                     )
+                elif msg_type == 41:
+                    # Validate required fields
+                    required_fields = [
+                        "imei", "grade", "volume", "money", "ppu",
+                        "status", "mstatus", "epoch", "fuel_time", "transaction_id"
+                    ]
+                    missing_fields = [f for f in required_fields if f not in data]
+                    if missing_fields:
+                        await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
+                        return
+
+                    try:
+                        imei = str(data["imei"])
+                        volume = float(data["volume"]) / 1000.0  # convert to liters
+                        money = float(data["money"]) / 1000.0    # convert to INR
+                        ppu = float(data["ppu"])
+                        status = int(data["status"])
+                        fuel_time = int(data["fuel_time"])
+                        epoch = int(data["epoch"])
+                        dispense_time = dj_timezone.make_aware(
+            datetime.fromtimestamp(epoch),
+            dj_timezone.get_current_timezone()
+        )
+                        transaction_id = str(data["transaction_id"])
+                    except (ValueError, TypeError, KeyError) as e:
+                        await self.send_error_message(f"Field type conversion error: {e}")
+                        return
+
+                    print(f"[DISPENSE FINAL] TXN={transaction_id} IMEI={imei} VOL={volume} ₹={money}")
+
+                    # Update DB
+                    await self.update_dispense_transaction_details(
+                        transaction_id=transaction_id,
+                        imei=imei,
+                        ppu=ppu,
+                        volume=volume,
+                        money=money,
+                        dispense_time=dispense_time,
+                        fuel_time=fuel_time,
+                        status=status
+                    )
+
 
                 else:
                     pass
@@ -359,3 +403,33 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         except DispenserUnits.DoesNotExist:
             print(f"[ERROR] Dispenser with IMEI {imei} not found for GPS update")
 
+
+
+    @database_sync_to_async
+    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time, status):
+
+        try:
+            txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
+        except RequestFuelDispensingDetails.DoesNotExist:
+            print(f"[ERROR] Transaction {transaction_id} not found")
+            return
+
+        if txn.dispenser_imeinumber != imei:
+            print(f"[MISMATCH] IMEI mismatch for transaction {transaction_id}")
+            return
+
+        txn.dispenser_live_price = ppu
+        txn.dispenser_received_volume = volume
+        txn.dispenser_received_price = money
+        txn.dispense_end_time = dispense_time
+        txn.dispense_time_taken = fuel_time
+        txn.dispense_status_code = status
+        txn.save(update_fields=[
+            "dispenser_live_price",
+            "dispenser_received_volume",
+            "dispenser_received_price",
+            "dispense_end_time",
+            "dispense_time_taken",
+            "dispense_status_code",
+        ])
+        print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
