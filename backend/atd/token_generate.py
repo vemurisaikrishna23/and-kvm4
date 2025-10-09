@@ -31,7 +31,7 @@ def verify_token(token: str, key: str):
 
 # Example
 key = "atd_shared_secret_key"
-imei = "863674079422992"
+imei = "999999999999999"
 token = generate_token(imei, key)
 print("Token:", token)
 valid, data = verify_token(token, key)
