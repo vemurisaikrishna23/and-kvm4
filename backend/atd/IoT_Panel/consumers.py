@@ -134,6 +134,33 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         return
                     print(f"[HARDWARE MESSAGE] Received from IMEI {imei}: {status}")
                     await self.update_machine_status(imei, status)
+                
+                elif msg_type == 51:
+                    imei = data.get("imei")
+                    price_status = data.get("price_update_status")
+                    volume = data.get("volume")
+                    money = data.get("money")
+                    ppu_level1 = data.get("ppu_level1")
+
+                    if None in [imei, price_status, volume, money, ppu_level1]:
+                        await self.send_error_message("Missing fields for type 51")
+                        return
+                    
+                    if price_status == "success":
+                        try:
+                            volume_val = float(volume) / 100
+                            money_val = float(money)
+                            price_val = float(ppu_level1)
+                        except ValueError:
+                            await self.send_error_message("Invalid number format in volume, money, or ppu_level1")
+                            return
+
+                        print(f"[PRICE UPDATE] IMEI={imei}, Vol={volume_val}, ₹={money_val}, PPU={price_val}")
+                        await self.update_price_fields(imei, volume_val, money_val, price_val)
+                    else:
+                        print(f"[SKIP PRICE UPDATE] Status = {price_status}")
+                else:
+                    pass
 
             # Forward to group (excluding sender)
             await self.channel_layer.group_send(
@@ -240,6 +267,20 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         except DispenserUnits.DoesNotExist:
             print(f"[ERROR] IMEI {imei} not found in DispenserUnits for machine status update")
 
+    @database_sync_to_async
+    def update_price_fields(self, imei, totalizer_reading, amount, live_price):
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+            Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                dispenser_unit_id=dispenser.id
+            ).update(
+                live_totalizer_reading=totalizer_reading,
+                live_total_reading_amount=amount,
+                live_price=live_price
+            )
+            print(f"[UPDATED LIVE DATA] IMEI={imei}")
+        except DispenserUnits.DoesNotExist:
+            print(f"[ERROR] IMEI {imei} not found for price update")
 
 
 
