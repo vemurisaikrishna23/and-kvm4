@@ -229,10 +229,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         status = int(data["status"])
                         fuel_time = int(data["fuel_time"])
                         epoch = int(data["epoch"])
-                        dispense_time = dj_timezone.make_aware(
-            datetime.fromtimestamp(epoch),
-            dj_timezone.get_current_timezone()
-        )
+                        dispense_time = dj_timezone.make_aware(datetime.fromtimestamp(epoch),dj_timezone.get_current_timezone())
                         transaction_id = str(data["transaction_id"])
                     except (ValueError, TypeError, KeyError) as e:
                         await self.send_error_message(f"Field type conversion error: {e}")
@@ -251,7 +248,40 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         fuel_time=fuel_time,
                         status=status
                     )
+                elif msg_type == 11:
+                    required_fields = [
+                        "imei", "transaction_id", "preset_state", "preset_volume_req", "preset_amount_req",
+                        "rfid_valid", "vehicle_tag_id", "live_preset_volume", "live_preset_price",
+                        "fuel_state", "status"
+                    ]
+                    missing_fields = [f for f in required_fields if f not in data]
+                    if missing_fields:
+                        await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
+                        return
 
+                    try:
+                        imei = str(data["imei"])
+                        transaction_id = str(data["transaction_id"])
+                        preset_state = int(data["preset_state"])
+                        preset_volume_req = float(data["preset_volume_req"])
+                        preset_amount_req = float(data["preset_amount_req"])
+                        rfid_valid = bool(data["rfid_valid"])
+                        vehicle_tag_id = str(data["vehicle_tag_id"])
+                        live_preset_volume = float(data["live_preset_volume"])
+                        live_preset_price = float(data["live_preset_price"])
+                        fuel_state = bool(data["fuel_state"])
+                        status = int(data["status"])
+                    except (ValueError, TypeError, KeyError) as e:
+                        await self.send_error_message(f"Field type conversion error: {e}")
+                        return
+
+                    # Forward to DB update
+                    result = await self.update_transaction_log(data)
+                    if "error" in result:
+                        await self.send_error_message(result["error"])
+                        return
+                    else:
+                        print(f"[PRESET LOG] Updated for TXN={transaction_id} IMEI={imei}")
 
                 else:
                     pass
@@ -433,3 +463,35 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             "dispense_status_code",
         ])
         print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
+
+
+    @database_sync_to_async
+    def update_transaction_log(self, data):
+
+        transaction_id = data.get("transaction_id")
+        imei = data.get("imei")
+
+        try:
+            request = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
+            if request.dispenser_imeinumber != imei:
+                return {"error": "IMEI mismatch with transaction record."}
+
+            # Prepare log (exclude these fields)
+            log_data = {
+                k: v for k, v in data.items()
+                if k not in ["type", "machine", "transaction_id", "imei"]
+            }
+
+            # Append to or initialize log
+            if isinstance(request.transaction_log, list):
+                request.transaction_log.append(log_data)
+            elif request.transaction_log:
+                request.transaction_log = [request.transaction_log, log_data]
+            else:
+                request.transaction_log = [log_data]
+
+            request.save(update_fields=["transaction_log"])
+            return {"success": True}
+
+        except RequestFuelDispensingDetails.DoesNotExist:
+            return {"error": "Transaction ID not found"}
