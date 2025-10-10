@@ -483,6 +483,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             "dispense_time_taken",
         ])
         print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
+        return {"success": True,"request_status": txn.request_status}
 
 
 
