@@ -149,11 +149,30 @@ class DeliveryLocation_Mapping_DispenserUnit(models.Model):
 
 
 class RequestFuelDispensingDetails(models.Model):
+    # Request_Status = [
+    #     (0, 'Pending'),
+    #     (1, 'Completed'),
+    #     (2, 'Failed'),
+    # ]
+
     Request_Status = [
         (0, 'Pending'),
-        (1, 'Completed'),
-        (2, 'Failed'),
+        (1, 'Hardware Received'),
+        (2, 'Dispensiing'),
+        (3, 'Completed'),
+        (4,'Interrupted'),
+        (5,'Failed')
     ]
+
+    #in transaction log status field:
+    #type 41 -- status 203 -- Request Status 3
+    #type 11 -- status 200 -- Request Status 1
+    #type 11 -- status 202 -- Request Status 2
+    #type 11 -- status 206 -- Request Status 2
+    #type 11 -- status 205 -- Request Status 4
+    #type 11 -- status 400,401,411,420,410 -- Request Status 5
+
+    #Default Ppending
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),

@@ -944,7 +944,7 @@ class GetFuelDispensingRequests(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
         if "IOT Admin" in roles:
-            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.all()
+            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.all().order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
@@ -978,7 +978,7 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                     )
 
             # Passed validation
-            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
+            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1013,7 +1013,7 @@ class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
                 if dispenser_mapping.customer != poc.belong_to_id:
                     return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
 
-            requests = RequestFuelDispensingDetails.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id)
+            requests = RequestFuelDispensingDetails.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1044,7 +1044,7 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
                 if delivery_location.customer_id != poc.belong_to_id:
                     return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
 
-            requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id)
+            requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
@@ -1074,7 +1074,7 @@ class GetFuelDispensingRequestsByAssetID(APIView):
                 if asset.customer_id != poc.belong_to_id:
                     return Response({"error": "You are not authorized to access this asset's data."}, status=status.HTTP_403_FORBIDDEN)
 
-            requests = RequestFuelDispensingDetails.objects.filter(asset_id=asset_id)
+            requests = RequestFuelDispensingDetails.objects.filter(asset_id=asset_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
@@ -1141,7 +1141,7 @@ class GetFuelDispensingRequestsByUserID(APIView):
                     return Response({"error": "This user does not belong to your customer."}, status=status.HTTP_403_FORBIDDEN)
 
             # Valid: same customer
-            requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id)
+            requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -229,7 +229,10 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         status = int(data["status"])
                         fuel_time = int(data["fuel_time"])
                         epoch = int(data["epoch"])
-                        dispense_time = dj_timezone.make_aware(datetime.fromtimestamp(epoch),dj_timezone.get_current_timezone())
+                        dispense_time = dj_timezone.make_aware(
+                            datetime.fromtimestamp(epoch),
+                            dj_timezone.get_current_timezone()
+                        )
                         transaction_id = str(data["transaction_id"])
                     except (ValueError, TypeError, KeyError) as e:
                         await self.send_error_message(f"Field type conversion error: {e}")
@@ -237,17 +240,29 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
                     print(f"[DISPENSE FINAL] TXN={transaction_id} IMEI={imei} VOL={volume} ₹={money}")
 
-                    # Update DB
-                    await self.update_dispense_transaction_details(
+                    # Update DB without status
+                    dispense_transaction_result = await self.update_dispense_transaction_details(
                         transaction_id=transaction_id,
                         imei=imei,
                         ppu=ppu,
                         volume=volume,
                         money=money,
                         dispense_time=dispense_time,
-                        fuel_time=fuel_time,
-                        status=status
+                        fuel_time=fuel_time
                     )
+
+                    # Set status separately
+                    request_status_result = await self.update_request_status_from_status_code(transaction_id, status)
+                    if "error" in dispense_transaction_result:
+                        await self.send_error_message(dispense_transaction_result["error"])
+                        return
+                    else:
+                        print(f"[DISPENSE TRANSACTION UPDATED] TXN={transaction_id} → Status={dispense_transaction_result['request_status']} from code={status}")
+                    if "error" in request_status_result:
+                        await self.send_error_message(request_status_result["error"])
+                        return
+                    else:
+                        print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status_result['request_status']} from code={status}")
                 elif msg_type == 11:
                     required_fields = [
                         "imei", "transaction_id", "preset_state", "preset_volume_req", "preset_amount_req",
@@ -277,6 +292,13 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
                     # Forward to DB update
                     result = await self.update_transaction_log(data)
+                    request_status_result = await self.update_request_status_from_status_code(transaction_id, imei, status)
+                    if "error" in request_status_result:
+                        await self.send_error_message(request_status_result["error"])
+                        return
+                    else:
+                        print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status_result['request_status']} from code={status}")
+
                     if "error" in result:
                         await self.send_error_message(result["error"])
                         return
@@ -437,14 +459,15 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time, status):
-
         try:
             txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
         except RequestFuelDispensingDetails.DoesNotExist:
+            return {"error": "Transaction ID not found"}
             print(f"[ERROR] Transaction {transaction_id} not found")
             return
 
         if txn.dispenser_imeinumber != imei:
+            return {"error": "IMEI mismatch with transaction record."}
             print(f"[MISMATCH] IMEI mismatch for transaction {transaction_id}")
             return
 
@@ -453,16 +476,15 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         txn.dispenser_received_price = money
         txn.dispense_end_time = dispense_time
         txn.dispense_time_taken = fuel_time
-        txn.dispense_status_code = status
         txn.save(update_fields=[
             "dispenser_live_price",
             "dispenser_received_volume",
             "dispenser_received_price",
             "dispense_end_time",
             "dispense_time_taken",
-            "dispense_status_code",
         ])
         print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
+
 
 
     @database_sync_to_async
@@ -494,4 +516,35 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             return {"success": True}
 
         except RequestFuelDispensingDetails.DoesNotExist:
+            return {"error": "Transaction ID not found"}
+
+    @database_sync_to_async
+    def update_request_status_from_status_code(self, transaction_id: str, imei: str, status_code: int):
+        try:
+            txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
+            if txn.dispenser_imeinumber != imei:
+                print(f"[SKIP STATUS] IMEI mismatch for TXN={transaction_id}")
+                return
+
+            # Map status_code to request_status
+            if status_code == 200:
+                request_status = 1  # Hardware Received
+            elif status_code in [202, 206]:
+                request_status = 2  # Dispensing
+            elif status_code == 203:
+                request_status = 3  # Completed
+            elif status_code == 205:
+                request_status = 4  # Interrupted
+            elif status_code in [400, 401, 410, 411, 420]:
+                request_status = 5  # Failed
+            else:
+                return {"error": "Invalid status code"}
+
+            txn.request_status = request_status
+            txn.dispense_status_code = status_code
+            txn.save(update_fields=["request_status", "dispense_status_code"])
+            print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status} from code={status_code}")
+
+        except RequestFuelDispensingDetails.DoesNotExist:
+            print(f"[ERROR] TXN={transaction_id} not found for request status update")
             return {"error": "Transaction ID not found"}
