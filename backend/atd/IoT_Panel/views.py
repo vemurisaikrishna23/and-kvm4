@@ -960,7 +960,7 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
 
             if 'Accounts Admin' in roles:
                 # Accounts Admin can fetch only their associated customer's data
@@ -1003,7 +1003,7 @@ class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
             dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(id=dispenser_gun_mapping_id)
         except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
             return Response({"error": "Dispenser Gun Mapping ID not found."}, status=status.HTTP_404_NOT_FOUND)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
             if 'Accounts Admin' in roles:
                 try:
                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
@@ -1043,9 +1043,6 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
 
                 if delivery_location.customer_id != poc.belong_to_id:
                     return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
-            # elif 'Dispenser Manager' in roles:
-
-
             requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1066,7 +1063,7 @@ class GetFuelDispensingRequestsByAssetID(APIView):
             asset = Assets.objects.get(id=asset_id)
         except Assets.DoesNotExist:
             return Response({"error": "Asset ID not found."}, status=status.HTTP_404_NOT_FOUND)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
             if 'Accounts Admin' in roles:
                 try:
                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
@@ -1098,7 +1095,7 @@ class GetFuelDispensingRequestsByID(APIView):
         except RequestFuelDispensingDetails.DoesNotExist:
             return Response({"error": "Fuel Dispensing Request ID not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
 
             if 'Accounts Admin' in roles:
                 # Check if the logged-in user is mapped to the same customer
@@ -1141,11 +1138,6 @@ class GetFuelDispensingRequestsByUserID(APIView):
                 target_poc = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="customer", belong_to_id=poc.belong_to_id).first()
                 if not target_poc:
                     return Response({"error": "This user does not belong to your customer."}, status=status.HTTP_403_FORBIDDEN)
-            elif (role in roles for role in ['Dispenser Manager','Location Manager','Dispenser']):
-                if int(user_id) != login_user_id:
-                    return Response({"error": "You can only view your own dispensing requests."}, status=status.HTTP_403_FORBIDDEN)
-
-
             # Valid: same customer
             requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
