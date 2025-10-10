@@ -1129,7 +1129,7 @@ class GetFuelDispensingRequestsByUserID(APIView):
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # If Accounts Admin – check if target_user belongs to their customer
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
             if 'Accounts Admin' in roles:
                 try:
                     poc = PointOfContacts.objects.get(user_id=login_user_id, belong_to_type="customer")
@@ -1139,6 +1139,10 @@ class GetFuelDispensingRequestsByUserID(APIView):
                 target_poc = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="customer", belong_to_id=poc.belong_to_id).first()
                 if not target_poc:
                     return Response({"error": "This user does not belong to your customer."}, status=status.HTTP_403_FORBIDDEN)
+            elif (role in roles for role in ['Dispenser Manager','Location Manager','Dispenser']):
+                if int(user_id) != login_user_id:
+                    return Response({"error": "You can only view your own dispensing requests."}, status=status.HTTP_403_FORBIDDEN)
+
 
             # Valid: same customer
             requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id).order_by('-request_created_at')
