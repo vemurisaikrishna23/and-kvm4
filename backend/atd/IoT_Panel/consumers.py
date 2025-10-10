@@ -86,7 +86,10 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
         # If hardware client → update connectivity status
         if self.client_type == 'hardware':
+            print("hardware client connected")
             await self.update_connectivity(self.imei_number, "online")
+        if self.client_type == 'web':
+            print("web client connected")
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_id, self.channel_name)
@@ -94,7 +97,10 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
         # Only update status if hardware disconnects
         if self.client_type == 'hardware':
+            print("hardware client disconnected")
             await self.update_connectivity(self.imei_number, "offline")
+        if self.client_type == 'web':
+            print("web client disconnected")
 
     async def receive(self, text_data=None, bytes_data=None):
         """

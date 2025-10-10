@@ -1034,7 +1034,7 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
             delivery_location = DeliveryLocations.objects.get(id=delivery_location_id)
         except DeliveryLocations.DoesNotExist:
             return Response({"error": "Delivery Location ID not found."}, status=status.HTTP_404_NOT_FOUND)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
             if 'Accounts Admin' in roles:
                 try:
                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
@@ -1043,6 +1043,8 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
 
                 if delivery_location.customer_id != poc.belong_to_id:
                     return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
+            # elif 'Dispenser Manager' in roles:
+
 
             requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
