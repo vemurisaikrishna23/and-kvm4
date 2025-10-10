@@ -458,18 +458,15 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
 
     @database_sync_to_async
-    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time, status):
+    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time):
         try:
             txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
         except RequestFuelDispensingDetails.DoesNotExist:
             return {"error": "Transaction ID not found"}
-            print(f"[ERROR] Transaction {transaction_id} not found")
-            return
 
         if txn.dispenser_imeinumber != imei:
             return {"error": "IMEI mismatch with transaction record."}
-            print(f"[MISMATCH] IMEI mismatch for transaction {transaction_id}")
-            return
+
 
         txn.dispenser_live_price = ppu
         txn.dispenser_received_volume = volume
