@@ -1089,6 +1089,7 @@ class GetFuelDispensingRequestsByID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
+        print("roles", roles)
 
         try:
             request_obj = RequestFuelDispensingDetails.objects.get(id=id)
