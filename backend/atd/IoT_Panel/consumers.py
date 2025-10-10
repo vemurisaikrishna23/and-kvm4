@@ -252,7 +252,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     )
 
                     # Set status separately
-                    request_status_result = await self.update_request_status_from_status_code(transaction_id, status)
+                    request_status_result = await self.update_request_status_from_status_code(transaction_id,imei, status)
                     if "error" in dispense_transaction_result:
                         await self.send_error_message(dispense_transaction_result["error"])
                         return
