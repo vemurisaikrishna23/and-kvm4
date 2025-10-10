@@ -294,12 +294,14 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     result = await self.update_transaction_log(data)
                     request_status_result = await self.update_request_status_from_status_code(transaction_id, imei, status)
                     if "error" in request_status_result:
+                        print(f"[ERROR] Request status update failed: {request_status_result['error']}")
                         await self.send_error_message(request_status_result["error"])
                         return
                     else:
                         print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status_result['request_status']} from code={status}")
 
                     if "error" in result:
+                        print(f"[ERROR] Preset log update failed: {result['error']}")
                         await self.send_error_message(result["error"])
                         return
                     else:
@@ -544,8 +546,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             txn.request_status = request_status
             txn.dispense_status_code = status_code
             txn.save(update_fields=["request_status", "dispense_status_code"])
+            print("sssssssssssssssssssssssssssss")
             print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status} from code={status_code}")
-            return {"success": True}
+            return {"success": True,"request_status": request_status}
 
         except RequestFuelDispensingDetails.DoesNotExist:
             print(f"[ERROR] TXN={transaction_id} not found for request status update")
