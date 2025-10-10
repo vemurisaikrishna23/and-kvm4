@@ -555,4 +555,3 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print(f"[ERROR] TXN={transaction_id} not found for request status update")
             return {"error": "Transaction ID not found"}
 
-            #update asset_tag_id
