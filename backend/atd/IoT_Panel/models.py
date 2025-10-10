@@ -163,16 +163,6 @@ class RequestFuelDispensingDetails(models.Model):
         (4,'Interrupted'),
         (5,'Failed')
     ]
-
-    #in transaction log status field:
-    #type 41 -- status 203 -- Request Status 3
-    #type 11 -- status 200 -- Request Status 1
-    #type 11 -- status 202 -- Request Status 2
-    #type 11 -- status 206 -- Request Status 2
-    #type 11 -- status 205 -- Request Status 4
-    #type 11 -- status 400,401,411,420,410 -- Request Status 5
-
-    #Default Ppending
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),
@@ -221,3 +211,32 @@ class RequestFuelDispensingDetails(models.Model):
         verbose_name = "Request Fuel Dispensing Details"
         verbose_name_plural = "Request Fuel Dispensing Details"
 
+
+class VIN_Vehicle(models.Model):
+    Tag_type = [
+        (1, 'None'),
+        (2, 'RFID'),
+        (3, 'NFC'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    vin = models.CharField(max_length=255, help_text="Vehicle Identification Number")
+    customer_id = models.BigIntegerField(help_text="Customer ID")
+    delivery_location_id = models.JSONField(default=list,help_text="Delivery Location ID")
+    point_of_contact_id = models.JSONField(default=list,help_text="Point of Contact ID")
+    vehicle_type = models.CharField(max_length=255, blank=True, null=True, help_text="Vehicle Type from Assets Type Table")
+    vehicle_type_name = models.CharField(max_length=255, blank=True, null=True, help_text="Vehicle Type Name from Assets Type Table")
+    capacity = models.IntegerField(blank=True, null=True,help_text="Capacity")
+    dg_kv = models.BigIntegerField(blank=True, null=True,help_text="DG KV if type is Diesel Generator")
+    tag_type = models.CharField(max_length=255, blank=True, null=True, help_text="Tag Type", choices=Tag_type)
+    tag_id = models.CharField(max_length=255, blank=True, null=True, help_text="Tag ID")
+    remarks = models.CharField(max_length=255, blank=True, null=True, help_text="Remarks")
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    updated_by = models.PositiveBigIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "vin_vehicle"
+        verbose_name = "VIN Vehicle"
+        verbose_name_plural = "VIN Vehicles"

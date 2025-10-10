@@ -548,6 +548,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             txn.dispense_status_code = status_code
             txn.save(update_fields=["request_status", "dispense_status_code"])
             print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status} from code={status_code}")
+            return {"success": True}
 
         except RequestFuelDispensingDetails.DoesNotExist:
             print(f"[ERROR] TXN={transaction_id} not found for request status update")

@@ -1722,3 +1722,7 @@ class GetFuelDispensingRequestsSerializerWithTransactionLog(serializers.ModelSer
                         "name": f"Unknown Location (ID: {loc_id})"
                     })
         return details
+
+
+
+# class AddVINVehicleSerializer(serializers.ModelSerializer):

@@ -1147,3 +1147,25 @@ class GetFuelDispensingRequestsByUserID(APIView):
 
         # For all other roles – deny
         return Response({"error": "You are not authorized to view fuel dispensing requests."}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Add VIN Vehicle
+# class AddVINVehicle(APIView):
+#     renderer_classes = [IoT_PanelRenderer]
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request, format=None):
+#         user = request.user
+#         user_id = getattr(user, "id", None)
+#         roles = get_user_roles(user_id)
+#         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager']):
+#             if 'IOT Admin' in roles:
+#                 serializer = AddVINVehicleSerializer(data=request.data, context={"user": user})
+#                 if serializer.is_valid(raise_exception=True):
+#                     try:
+#                         serializer.save()
+#                         return Response({
+#                             "message": "VIN Vehicle Created Successfully",
+#                         }, status=status.HTTP_201_CREATED)
+#                     except serializers.ValidationError as e:
+#                         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
