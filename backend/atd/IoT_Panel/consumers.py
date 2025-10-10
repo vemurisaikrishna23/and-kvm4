@@ -527,18 +527,22 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 return
 
             # Map status_code to request_status
+
             if status_code == 200:
                 request_status = 1  # Hardware Received
-            elif status_code in [202, 206]:
+            elif status_code == 0:
+                request_status = 0  # Pending
+            elif status_code in [201,202, 206]:
                 request_status = 2  # Dispensing
-            elif status_code == 203:
+            elif status_code in [203,204]:
                 request_status = 3  # Completed
             elif status_code == 205:
                 request_status = 4  # Interrupted
-            elif status_code in [400, 401, 410, 411, 420]:
+            elif status_code in [400, 401,402, 410, 411, 420]:
                 request_status = 5  # Failed
+
             else:
-                return {"error": "Invalid status code"}
+                request_status = 5  #Failed
 
             txn.request_status = request_status
             txn.dispense_status_code = status_code
