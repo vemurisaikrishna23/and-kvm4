@@ -6,6 +6,11 @@ from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 import os
 import django
+from django.db.models import Q   # ✅ added
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'atd.settings')
+django.setup()
+
 from asgiref.sync import sync_to_async
 from datetime import datetime
 from pytz import timezone 
@@ -15,8 +20,7 @@ from existing_tables.models import *
 from django.utils import timezone as dj_timezone
 from datetime import datetime
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'atd.settings')
-django.setup()
+
 
 
 # --- GLOBAL CONNECTION TRACKER ---
@@ -243,7 +247,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     except (ValueError, TypeError, KeyError) as e:
                         await self.send_error_message(f"Field type conversion error: {e}")
                         return
-
+                
                     print(f"[DISPENSE FINAL] TXN={transaction_id} IMEI={imei} VOL={volume} ₹={money}")
 
                     # Update DB without status
@@ -268,6 +272,18 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         await self.send_error_message(request_status_result["error"])
                         return
                     else:
+                        if str(transaction_id).upper().startswith("VIN"):
+                            self.send_data({"type":99,"machine": "hardware","data":transaction_id})
+                            vin_update = await self.mark_vin_vehicle_status_true(transaction_id)
+                            self.send_data({"type":99,"machine": "hardware","data":vin_update})
+                            if "error" in vin_update:
+                                await self.send_error_message(vin_update["error"])
+                                print(f"[VIN FLAG][WARN] TXN={transaction_id} could not update VIN_Vehicle.status=True → {vin_update['error']}")
+                                return
+                            else:
+                                self.send_data({"type":99,"machine": "hardware","set to true":transaction_id})
+                                print(f"[VIN FLAG] TXN={transaction_id} VIN_Vehicle.status set to True")
+
                         print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status_result['request_status']} from code={status}")
                 elif msg_type == 11:
                     required_fields = [
@@ -553,7 +569,6 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             txn.request_status = request_status
             txn.dispense_status_code = status_code
             txn.save(update_fields=["request_status", "dispense_status_code"])
-            print("sssssssssssssssssssssssssssss")
             print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status} from code={status_code}")
             return {"success": True,"request_status": request_status}
 
@@ -561,3 +576,19 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print(f"[ERROR] TXN={transaction_id} not found for request status update")
             return {"error": "Transaction ID not found"}
 
+    @sync_to_async
+    def mark_vin_vehicle_status_true(self,txn_id: str):
+        """
+        Finds the latest VIN_Vehicle row for this exact transaction_id
+        and sets status=True. Returns a small result dict.
+        """
+        try:
+            row =VIN_Vehicle.objects.get(transaction_id=txn_id)
+            if not row:
+                return {"error": f"VIN_Vehicle not found for transaction_id={txn_id}"}
+            if getattr(row, "status", None) is not True:
+                row.status = True
+                row.save(update_fields=["status"])
+            return {"ok": True}
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}

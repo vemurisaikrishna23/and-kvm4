@@ -124,7 +124,7 @@ class NodeDispenserCustomerMapping(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     created_by = models.PositiveBigIntegerField(blank=True, null=True)
     updated_by = models.PositiveBigIntegerField(blank=True, null=True)
-    
+
     class Meta:
         db_table = "node_dispenser_customer_mapping"
         verbose_name = "Node-Dispenser Mapping to Customer"
@@ -167,6 +167,11 @@ class RequestFuelDispensingDetails(models.Model):
         (0, 'Volume'),
         (1, 'Amount'),
     ]
+
+    Request_Vehicle = [
+        (0, 'Asset'),
+        (1, 'VIN'),
+    ]
     id = models.BigAutoField(primary_key=True)
     user_id = models.BigIntegerField(help_text="User ID of who is requesting the fuel dispensing")
     user_name = models.CharField(max_length=255,blank=True,null=True, help_text="User Name")
@@ -182,8 +187,8 @@ class RequestFuelDispensingDetails(models.Model):
     customer_name = models.CharField(max_length=255, help_text="Customer Name")
     customer_email = models.EmailField(blank=True,null=True, help_text="Customer Email")
     customer_phone = models.CharField(max_length=255,blank=True,null=True, help_text="Customer Phone")
-    asset_id = models.BigIntegerField(help_text="Asset ID")
-    asset_name = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Name")
+    asset_id = models.BigIntegerField(help_text="Asset ID / VIN ID")
+    asset_name = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Name /VIN Name")
     asset_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag ID")
     asset_tag_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag Type")
     asset_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Type")
@@ -193,6 +198,7 @@ class RequestFuelDispensingDetails(models.Model):
     dispenser_live_price = models.FloatField(blank=True,null=True, help_text="Dispenser Live Price")
     dispenser_received_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Received Volume")
     dispenser_received_price = models.FloatField(blank=True,null=True, help_text="Dispenser Received Price")
+    request_vehicle = models.IntegerField(default=0, choices=Request_Vehicle, help_text="Request Vehicle")
     request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
     request_status = models.IntegerField(default=0, choices=Request_Status, help_text="Request Status")
     fuel_state = models.BooleanField(default=False)
@@ -223,14 +229,18 @@ class VIN_Vehicle(models.Model):
     vin = models.CharField(max_length=255, help_text="Vehicle Identification Number")
     customer_id = models.BigIntegerField(help_text="Customer ID")
     delivery_location_id = models.JSONField(default=list,help_text="Delivery Location ID")
-    point_of_contact_id = models.JSONField(default=list,help_text="Point of Contact ID")
+    point_of_contact_id = models.JSONField(default=list,help_text="Point of Contact ID") 
     vehicle_type = models.CharField(max_length=255, blank=True, null=True, help_text="Vehicle Type from Assets Type Table")
     vehicle_type_name = models.CharField(max_length=255, blank=True, null=True, help_text="Vehicle Type Name from Assets Type Table")
     capacity = models.IntegerField(blank=True, null=True,help_text="Capacity")
     dg_kv = models.BigIntegerField(blank=True, null=True,help_text="DG KV if type is Diesel Generator")
+    transaction_id = models.CharField(blank=True,null=True,max_length=255, help_text="Transaction ID")
+    dispense_volume = models.FloatField(blank=True,null=True, help_text="max dispense volume given to this vin")
+    buffer_dispense_volume  = models.FloatField(blank=True,null=True, help_text="buffer dispense volume given to this vin")
+    buffer_reason = models.CharField(max_length=255, blank=True, null=True, help_text="Reason to allocate the buffer volume")
     tag_type = models.CharField(max_length=255, blank=True, null=True, help_text="Tag Type", choices=Tag_type)
     tag_id = models.CharField(max_length=255, blank=True, null=True, help_text="Tag ID")
-    remarks = models.CharField(max_length=255, blank=True, null=True, help_text="Remarks")
+    status = models.BooleanField(default=False,help_text="whether this vin is used or not once")
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     created_by = models.PositiveBigIntegerField(blank=True, null=True)

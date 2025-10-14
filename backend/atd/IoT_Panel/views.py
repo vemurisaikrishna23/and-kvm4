@@ -822,6 +822,57 @@ class GetDeliveryLocationMappingDispenserUnitByCustomerID(APIView):
             return Response({"error": "You are not authorized to get delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
+class GetDeliveryLocationMappingDispenserUnitByPOC(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        if 'Dispenser' in roles:
+            return Response(
+                {"error": "You are not authorized to access this data."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        poc_entries = PointOfContacts.objects.filter(
+            user_id=user_id,
+            belong_to_type='delivery_location'
+        )
+        delivery_location_ids = [poc.belong_to_id for poc in poc_entries]
+
+        if not delivery_location_ids:
+            return Response(
+                {"message": "No delivery locations mapped to this user."},
+                status=status.HTTP_200_OK
+            )
+
+        direct_matches = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+            delivery_location_id__in=delivery_location_ids
+        )
+
+        accessible_matches = []
+        for mapping in DeliveryLocation_Mapping_DispenserUnit.objects.all():
+            if mapping.DU_Accessible_delivery_locations:
+                if any(loc_id in delivery_location_ids for loc_id in mapping.DU_Accessible_delivery_locations):
+                    accessible_matches.append(mapping)
+
+        combined_records = list(direct_matches) + accessible_matches
+
+        # Deduplicate based on dispenser_gun_mapping_id
+        unique_records = {}
+        for record in combined_records:
+            gun_map_id = getattr(record.dispenser_gun_mapping_id, "id", None)
+            if gun_map_id not in unique_records:
+                unique_records[gun_map_id] = record
+
+        final_records = list(unique_records.values())
+        serializer = GetDeliveryLocationMappingDispenserUnitSerializer(final_records, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 #Get Dispenser Gun Mapping List by Delivery Location ID's
 class GetDispenserGunMappingListByDeliveryLocationIDs(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -913,6 +964,7 @@ class CreateRequestForFuelDispensing(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
+        print(user_id)
 
         try:
             serializer = CreateRequestForFuelDispensingSerializer(
@@ -1021,7 +1073,8 @@ class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Fuel Dispensing Requests by Delivery Location ID
+
+# Get Fuel Dispensing Requests by Delivery Location ID or Accessible Locations
 class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1030,24 +1083,92 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
+
+        # 1️⃣ Validate that delivery location exists
         try:
             delivery_location = DeliveryLocations.objects.get(id=delivery_location_id)
         except DeliveryLocations.DoesNotExist:
-            return Response({"error": "Delivery Location ID not found."}, status=status.HTTP_404_NOT_FOUND)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
+            return Response(
+                {"error": "Delivery Location ID not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2️⃣ Access allowed roles
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
+            
+            # 3️⃣ For Accounts Admin → validate customer association
             if 'Accounts Admin' in roles:
                 try:
                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
                 except PointOfContacts.DoesNotExist:
-                    return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
+                    return Response(
+                        {"error": "You are not associated with any customer."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
 
                 if delivery_location.customer_id != poc.belong_to_id:
-                    return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
-            requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id).order_by('-request_created_at')
-            serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
+                    return Response(
+                        {"error": "You are not authorized to access this dispenser's data."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            # 4️⃣ Query 1: direct matches
+            direct_matches = RequestFuelDispensingDetails.objects.filter(
+                delivery_location_id=delivery_location_id
+            )
+
+            # 5️⃣ Query 2: accessible matches — loop since MySQL doesn't support overlap
+            accessible_matches = []
+            for req in RequestFuelDispensingDetails.objects.exclude(DU_Accessible_delivery_locations=None):
+                du_list = req.DU_Accessible_delivery_locations or []
+                if isinstance(du_list, list) and delivery_location_id in du_list:
+                    accessible_matches.append(req)
+
+            # 6️⃣ Combine both
+            all_matches = list(direct_matches) + accessible_matches
+
+            # 7️⃣ Deduplicate (in case same record matched both)
+            unique_records = {req.id: req for req in all_matches}
+            final_requests = list(unique_records.values())
+
+            # 8️⃣ Serialize
+            serializer = GetFuelDispensingRequestsSerializer(final_requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
+
         else:
-            return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "You are not authorized to access this data."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+# #Get Fuel Dispensing Requests by Delivery Location ID
+# class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
+#     renderer_classes = [IoT_PanelRenderer]
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, delivery_location_id, format=None):
+#         user = request.user
+#         user_id = getattr(user, "id", None)
+#         roles = get_user_roles(user_id)
+#         try:
+#             delivery_location = DeliveryLocations.objects.get(id=delivery_location_id)
+#         except DeliveryLocations.DoesNotExist:
+#             return Response({"error": "Delivery Location ID not found."}, status=status.HTTP_404_NOT_FOUND)
+#         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
+#             if 'Accounts Admin' in roles:
+#                 try:
+#                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+#                 except PointOfContacts.DoesNotExist:
+#                     return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
+
+#                 if delivery_location.customer_id != poc.belong_to_id:
+#                     return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
+#             requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id).order_by('-request_created_at')
+#             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
+#             return Response(serializer.data, status=status.HTTP_200_OK)
+#         else:
+#             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
 
 
 #Get Fuel Dispensing Requests by Asset ID
@@ -1149,22 +1270,290 @@ class GetFuelDispensingRequestsByUserID(APIView):
 
 
 #Add VIN Vehicle
-# class AddVINVehicle(APIView):
-#     renderer_classes = [IoT_PanelRenderer]
-#     permission_classes = [IsAuthenticated]
+class AddVINVehicle(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
 
-#     def post(self, request, format=None):
-#         user = request.user
-#         user_id = getattr(user, "id", None)
-#         roles = get_user_roles(user_id)
-#         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager']):
-#             if 'IOT Admin' in roles:
-#                 serializer = AddVINVehicleSerializer(data=request.data, context={"user": user})
-#                 if serializer.is_valid(raise_exception=True):
-#                     try:
-#                         serializer.save()
-#                         return Response({
-#                             "message": "VIN Vehicle Created Successfully",
-#                         }, status=status.HTTP_201_CREATED)
-#                     except serializers.ValidationError as e:
-#                         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, format=None):
+        user = request.user
+        roles = get_user_roles(user.id)
+
+        # Only these roles can add VINs
+        if not any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager']):
+            return Response(
+                {"error": "You are not authorized to add VIN vehicles."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = AddVINVehicleSerializer(data=request.data, context={"user": user, "roles": roles})
+        serializer.is_valid(raise_exception=True)
+        vin_vehicle = serializer.save()
+
+        return Response(
+            {
+                "message": "VIN Vehicle Created Successfully",
+                "transaction_id": vin_vehicle.transaction_id,
+                "vin_id": vin_vehicle.id
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class GetVINVehicleByVIN(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, vin, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # 1) VIN exists?
+        try:
+            vin_vehicle = VIN_Vehicle.objects.get(vin=vin)
+        except VIN_Vehicle.DoesNotExist:
+            return Response({"error": "VIN not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Already used?
+        if vin_vehicle.status is True:
+            return Response(
+                {"error": "VIN already used for fuel dispensing."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2) If POC list is empty -> allow anyone (authenticated) to view
+        poc_ids = vin_vehicle.point_of_contact_id or []
+        if not poc_ids:
+            serializer = GetVINVehicleSerializer(vin_vehicle)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # 3) Role-based access (only enforced when poc_ids is non-empty)
+        if 'IOT Admin' in roles:
+            pass  # full access
+        elif any(role in roles for role in ['Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
+            if user_id not in poc_ids:
+                return Response(
+                    {"error": "You are not authorized to access this VIN."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        else:
+            return Response(
+                {"error": "You are not authorized to access this VIN."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 4) OK -> return data
+        serializer = GetVINVehicleSerializer(vin_vehicle)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+class GetVINVehicleByID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, vin_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # ---------- 1️⃣ Fetch VIN ----------
+        try:
+            vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
+        except VIN_Vehicle.DoesNotExist:
+            return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # ---------- 2️⃣ Role-based Authorization ----------
+        if "IOT Admin" in roles:
+            pass  # full access
+
+        elif "Accounts Admin" in roles:
+            try:
+                poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+            except PointOfContacts.DoesNotExist:
+                return Response({"error": "You are not associated with any customer."},
+                                status=status.HTTP_403_FORBIDDEN)
+            if poc.belong_to_id != vin_vehicle.customer_id:
+                return Response({"error": "You are not authorized to view this VIN vehicle."},
+                                status=status.HTTP_403_FORBIDDEN)
+
+        elif any(role in roles for role in ["Dispenser Manager", "Location Manager", "Dispenser"]):
+            user_pocs = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="delivery_location")
+            if not user_pocs.exists():
+                return Response({"error": "You are not associated with any delivery location."},
+                                status=status.HTTP_403_FORBIDDEN)
+            delivery_location_ids = [poc.belong_to_id for poc in user_pocs]
+            vin_locations = vin_vehicle.delivery_location_id or []
+            if not any(loc_id in vin_locations for loc_id in delivery_location_ids):
+                return Response({"error": "You are not authorized to view this VIN vehicle."},
+                                status=status.HTTP_403_FORBIDDEN)
+        else:
+            return Response({"error": "You are not authorized to view VIN vehicles."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        # ---------- 3️⃣ Serialize and Return ----------
+        serializer = GetVINVehicleSerializer(vin_vehicle)
+        return Response(serializer.data, status=status.HTTP_200_OK)    
+
+
+class GetVINVehicleByCustomerID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        query_type = request.query_params.get("data", "all").lower()  # all | used | unused
+
+        # ---------- 🧩 Role Validation ----------
+        if not any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager']):
+            return Response(
+                {"error": "You are not authorized to access VINs by customer ID."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # ---------- 🔍 Base Query ----------
+        vins = VIN_Vehicle.objects.filter(customer_id=customer_id)
+
+        if not vins.exists():
+            return Response(
+                {"message": f"No VIN records found for customer ID {customer_id}."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # ---------- 🎚️ Apply “used” or “unused” filter ----------
+        if query_type == "used":
+            vins = vins.filter(status=True)
+        elif query_type == "unused":
+            vins = vins.filter(status=False)
+
+        # ---------- 🧾 Accounts Admin Validation ----------
+        if 'Accounts Admin' in roles:
+            try:
+                poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+            except PointOfContacts.DoesNotExist:
+                return Response(
+                    {"error": "You are not associated with any customer."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if poc.belong_to_id != int(customer_id):
+                return Response(
+                    {"error": "You are not authorized to access this customer's VIN data."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # ---------- 🧭 Dispenser Manager / Location Manager Validation ----------
+        elif any(role in roles for role in ['Dispenser Manager', 'Location Manager']):
+            # Get all delivery locations assigned to this user
+            user_pocs = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="delivery_location")
+            if not user_pocs.exists():
+                return Response(
+                    {"error": "You are not associated with any delivery location."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            delivery_location_ids = [poc.belong_to_id for poc in user_pocs]
+
+            # Filter VINs by both customer_id and matching delivery locations
+            vins = vins.filter(
+                Q(delivery_location_id__contains=delivery_location_ids[0]) |
+                Q(delivery_location_id__icontains=str(delivery_location_ids[0]))
+            )
+
+            # For multiple delivery locations, chain OR conditions
+            if len(delivery_location_ids) > 1:
+                q_filter = Q()
+                for loc_id in delivery_location_ids:
+                    q_filter |= Q(delivery_location_id__contains=loc_id) | Q(delivery_location_id__icontains=str(loc_id))
+                vins = vins.filter(q_filter)
+
+            if not vins.exists():
+                return Response(
+                    {"message": "No VIN records found for your assigned delivery locations."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # ---------- ✅ Serialize and Return ----------
+        serializer = GetVINVehicleSerializer(vins, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class EditVINVehicle(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+    
+    def put(self, request, vin_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # ---------- 1️⃣ Fetch VIN ----------
+        try:
+            vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
+        except VIN_Vehicle.DoesNotExist:
+            return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # ---------- 2️⃣ Initialize Serializer ----------
+        serializer = EditVINVehicleSerializer(
+            vin_vehicle,
+            data=request.data,
+            partial=True,
+            context={
+                "user": user,
+                "roles": roles,
+                "vin_vehicle": vin_vehicle,
+            },
+        )
+
+        # ---------- 3️⃣ Validate & Save ----------
+        serializer.is_valid(raise_exception=True)
+        updated_vin = serializer.save()
+
+        return Response(
+            {
+                "message": "VIN vehicle updated successfully.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class DeleteVINVehicle(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, vin_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # ---------- 1️⃣ Check VIN existence ----------
+        try:
+            vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
+        except VIN_Vehicle.DoesNotExist:
+            return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # ---------- 2️⃣ Initialize Serializer ----------
+        serializer = DeleteVINVehicleSerializer(
+            vin_vehicle,
+            context={"user": user, "roles": roles, "vin_vehicle": vin_vehicle},
+        )
+
+        # ---------- 3️⃣ Validation ----------
+        serializer.is_valid(raise_exception=True)
+
+        # ---------- 4️⃣ Perform Hard Delete ----------
+        serializer.delete(vin_vehicle)
+
+        return Response(
+            {
+                "message": "VIN vehicle deleted successfully and permanently removed.",
+                "vin_id": vin_id
+            },
+            status=status.HTTP_200_OK,
+        )
+
+        

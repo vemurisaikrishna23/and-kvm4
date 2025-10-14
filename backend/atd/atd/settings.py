@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
+    'django_mysql_geventpool',
+
 
 
     'existing_tables',
@@ -96,13 +98,14 @@ DATABASES = {
         "NAME": "atd_uat_db",
         "USER": "iotjaideep",
         "PASSWORD": "k8P3x7M1s4",
-        # "HOST": "Atd-iot-db.coh7dtk0kjb8.ap-south-1.rds.amazonaws.com",
-        "HOST": "65.1.231.95",
+        "HOST": "Atd-iot-db.coh7dtk0kjb8.ap-south-1.rds.amazonaws.com",
+        # "HOST": "65.1.231.95",
         "PORT": "3306",
-        "OPTIONS": {
+        "CONN_MAX_AGE": 1800,  # keep as is
+            "OPTIONS": {
             "charset": "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },  
+        },
     }
 }
 
@@ -144,6 +147,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -165,7 +172,7 @@ CHANNEL_LAYERS = {
             'hosts': [('192.210.241.34', 6379)],
         },
     },
-}
+}   
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=144000),
@@ -191,5 +198,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3090",
     "http://127.0.0.1:3090",
     "http://atd.myaccessio.com",
-    "https://atd.myaccessio.com"
+    "https://atd.myaccessio.com",
+    "http://anytimediesel.myaccessio.com",
+    "https://anytimediesel.myaccessio.com"
 ]

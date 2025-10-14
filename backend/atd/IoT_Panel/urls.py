@@ -43,9 +43,10 @@ urlpatterns = [
     path("delivery-location-mapping-dispenser-unit/add/", AddDeliveryLocationMappingDispenserUnit.as_view(), name="add-delivery-location-mapping-dispenser-unit"),
     path("delivery-location-mapping-dispenser-unit/get/", GetDeliveryLocationMappingDispenserUnit.as_view(), name="get-delivery-location-mapping-dispenser-unit"),
     path("delivery-location-mapping-dispenser-unit/get/<int:customer_id>/", GetDeliveryLocationMappingDispenserUnitByCustomerID.as_view(), name="get-delivery-location-mapping-dispenser-unit-by-customer-id"),
+    path("delivery-location-mapping/dispenser-unit/by-poc/",GetDeliveryLocationMappingDispenserUnitByPOC.as_view(),name="get_delivery_location_mapping_dispenser_unit"),
     path("delivery-location-mapping-dispenser-unit/edit/<int:id>/", EditDeliveryLocationMappingDispenserUnit.as_view(), name="edit-delivery-location-mapping-dispenser-unit"),
     path("delivery-location-mapping-dispenser-unit/delete/<int:id>/", DeleteDeliveryLocationMappingDispenserUnit.as_view(), name="delete-delivery-location-mapping-dispenser-unit"),
-
+    
     path("request-fuel-dispensing/create/", CreateRequestForFuelDispensing.as_view(), name="create-request-for-fuel-dispensing"),
     path("request-fuel-dispensing/get/", GetFuelDispensingRequests.as_view(), name="get-all-fuel-dispensing-requests"),
     path("request-fuel-dispensing/get/customer_id/<int:customer_id>/", GetFuelDispensingRequestsByCustomerID.as_view(), name="get-fuel-dispensing-requests-by-customer-id"),
@@ -54,5 +55,15 @@ urlpatterns = [
     path("request-fuel-dispensing/get/asset_id/<int:asset_id>/", GetFuelDispensingRequestsByAssetID.as_view(), name="get-fuel-dispensing-requests-by-asset-id"),
     path("request-fuel-dispensing/get/id/<int:id>/", GetFuelDispensingRequestsByID.as_view(), name="get-fuel-dispensing-requests-by-id"),
     path("request-fuel-dispensing/get/user_id/<int:user_id>/", GetFuelDispensingRequestsByUserID.as_view(), name="get-fuel-dispensing-requests-by-user-id"),
+
+
+    path("vin-vehicle/add/", AddVINVehicle.as_view(), name="add_vin_vehicle"),
+    path("vin-vehicle/get/<int:customer_id>/", GetVINVehicleByCustomerID.as_view(), name="vin-vehicle-get-by-customerid"),
+    path("vin-vehicle/get/id/<int:vin_id>/", GetVINVehicleByID.as_view(), name="vin-vehicle-get-by-id"),
+    path("vin-vehicle/get/vin/<str:vin>/", GetVINVehicleByVIN.as_view(), name="get_vin_vehicle_by_vin"),
+    path("vin-vehicle/edit/<int:vin_id>/", EditVINVehicle.as_view(), name="edit-vin-vehicle"),
+    path("vin-vehicle/delete/<int:vin_id>/", DeleteVINVehicle.as_view(), name="delete-vin-vehicle"),
+
+
 ]
 

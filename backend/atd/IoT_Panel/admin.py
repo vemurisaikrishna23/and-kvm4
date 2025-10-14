@@ -9,3 +9,6 @@ admin.site.register(Dispenser_Gun_Mapping_To_Customer)
 admin.site.register(NodeDispenserCustomerMapping)
 admin.site.register(DeliveryLocation_Mapping_DispenserUnit)
 admin.site.register(RequestFuelDispensingDetails)
+admin.site.register(VIN_Vehicle)
+
+

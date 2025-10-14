@@ -105,6 +105,19 @@ class ApplicableAdditionalCharge(models.Model):
         db_table = 'applicable_additional_charge'
 
 
+class AssetTypes(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    type = models.CharField(max_length=50)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    is_active = models.IntegerField(blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'asset_types'
+
+
 class Assets(models.Model):
     id = models.BigAutoField(primary_key=True)
     organization = models.ForeignKey('Organizations', models.DO_NOTHING, blank=True, null=True)
