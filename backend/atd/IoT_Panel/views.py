@@ -1309,9 +1309,8 @@ class GetVINVehicleByVIN(APIView):
         roles = get_user_roles(user_id)
 
         # 1) VIN exists?
-        try:
-            vin_vehicle = VIN_Vehicle.objects.get(vin=vin)
-        except VIN_Vehicle.DoesNotExist:
+        vin_vehicle = VIN_Vehicle.objects.filter(vin=vin).order_by('-id').first()
+        if not vin_vehicle:
             return Response({"error": "VIN not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Already used?
