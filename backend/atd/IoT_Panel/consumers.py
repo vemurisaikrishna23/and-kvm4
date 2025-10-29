@@ -342,7 +342,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                             }
 
                             # Optional: Save totalizer and GPS data to DB here or pass to function
-                            await self.save_totalizer_and_gps_starting(transaction_id, imei, totalizer_volume_starting, totalizer_price_starting, gps_coordinates_starting)
+                            await self.save_totalizer_and_gps_starting_with_validation(transaction_id, imei, totalizer_volume_starting, totalizer_price_starting, gps_coordinates_starting)
 
                         except (ValueError, TypeError, KeyError) as e:
                             await self.send_error_message(f"GPS/Totalizer parsing error: {e}")
