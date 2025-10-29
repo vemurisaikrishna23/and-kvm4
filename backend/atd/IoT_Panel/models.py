@@ -163,6 +163,11 @@ class RequestFuelDispensingDetails(models.Model):
         (4,'Interrupted'),
         (5,'Failed')
     ]
+
+    Validation_Status = [
+        (0, 'True'),
+        (1, 'False')
+    ]
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),
@@ -198,6 +203,13 @@ class RequestFuelDispensingDetails(models.Model):
     dispenser_live_price = models.FloatField(blank=True,null=True, help_text="Dispenser Live Price")
     dispenser_received_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Received Volume")
     dispenser_received_price = models.FloatField(blank=True,null=True, help_text="Dispenser Received Price")
+    totalizer_volume_starting = models.FloatField(blank=True,null=True, help_text="Totalizer Volume at transaction starting")
+    totalizer_volume_ending = models.FloatField(blank=True,null=True, help_text="Totalizer Volume at transaction ending")
+    totalizer_price_starting = models.FloatField(blank=True,null=True, help_text="Totalizer Price at transaction starting")
+    totalizer_price_ending = models.FloatField(blank=True,null=True, help_text="Totalizer Price at transaction ending")
+    gps_coordinates_starting = models.JSONField(blank=True, null=True, help_text="GPS coordinates at transaction starting as JSON: {'lat': ..., 'lon': ...}")
+    gps_coordinates_ending = models.JSONField(blank=True, null=True, help_text="GPS coordinates at transaction ending as JSON: {'lat': ..., 'lon': ...}")
+    totalizer_validation = models.IntegerField(default=0, choices=Validation_Status, help_text="Totalizer Reading Validation with previous transaction")
     request_vehicle = models.IntegerField(default=0, choices=Request_Vehicle, help_text="Request Vehicle")
     request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
     request_status = models.IntegerField(default=0, choices=Request_Status, help_text="Request Status")

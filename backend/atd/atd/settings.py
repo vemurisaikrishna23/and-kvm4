@@ -43,10 +43,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
-    'django_mysql_geventpool',
-
-
-
     'existing_tables',
     'UserAccounts',
     'IoT_Panel',
