@@ -1,3 +1,4 @@
+from re import A
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
 from asgiref.sync import async_to_sync
@@ -146,6 +147,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         return
                     print(f"[HARDWARE MESSAGE] Received from IMEI {imei}: {status}")
                     await self.update_machine_status(imei, status)
+                    await self.update_connectivity(imei, "online")
                 
                 elif msg_type == 51:
                     imei = data.get("imei")
