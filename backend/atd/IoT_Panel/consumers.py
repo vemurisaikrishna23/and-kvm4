@@ -224,7 +224,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     # Validate required fields
                     required_fields = [
                         "imei", "grade", "volume", "money", "ppu",
-                        "status", "mstatus", "epoch", "fuel_time", "transaction_id"
+                        "status", "mstatus", "epoch", "fuel_time", "transaction_id","gvr_money","gvr_volume"
                     ]
                     missing_fields = [f for f in required_fields if f not in data]
                     if missing_fields:
@@ -238,6 +238,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         ppu = float(data["ppu"])
                         status = int(data["status"])
                         fuel_time = int(data["fuel_time"])
+                        gvr_volume = int(data["gvr_volume"])
+                        gvr_money = int(data["gvr_money"])
                         epoch = int(data["epoch"])
                         dispense_time = dj_timezone.make_aware(
                             datetime.fromtimestamp(epoch),
@@ -258,7 +260,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         volume=volume,
                         money=money,
                         dispense_time=dispense_time,
-                        fuel_time=fuel_time
+                        fuel_time=fuel_time,
+                        gvr_money=gvr_money,
+                        gvr_volume=gvr_volume
                     )
 
                     # Set status separately
@@ -291,6 +295,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         "rfid_valid", "vehicle_tag_id", "live_preset_volume", "live_preset_price",
                         "fuel_state", "status"
                     ]
+
+                    if data.get("status") == 200:
+                        required_fields += ["totalizer_volume_starting", "totalizer_price_starting","time_utc", "lat", "lon", "alt_m", "sats_used", "speed_kmh", "course_deg"]
                     missing_fields = [f for f in required_fields if f not in data]
                     if missing_fields:
                         await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
@@ -312,6 +319,34 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         await self.send_error_message(f"Field type conversion error: {e}")
                         return
 
+
+                    # Handle GPS + Totalizer if status == 200
+                    if status == 200:
+                        try:
+                            totalizer_volume_starting = float(data["totalizer_volume_starting"]/100)
+                            totalizer_price_starting = float(data["totalizer_price_starting"])
+
+                            # GPS fallbacks
+                            lat = 0.0 if data["lat"] is None else float(data["lat"])
+                            lon = 0.0 if data["lon"] is None else float(data["lon"])
+                            alt_m = 0.0 if data["alt_m"] is None else float(data["alt_m"])
+
+                            gps_coordinates_starting = {
+                                "time_utc": str(data["time_utc"]),
+                                "lat": lat,
+                                "lon": lon,
+                                "alt_m": alt_m,
+                                "sats_used": int(data["sats_used"]),
+                                "speed_kmh": float(data["speed_kmh"]),
+                                "course_deg": float(data["course_deg"]),
+                            }
+
+                            # Optional: Save totalizer and GPS data to DB here or pass to function
+                            await self.save_totalizer_and_gps_starting(transaction_id, imei, totalizer_volume_starting, totalizer_price_starting, gps_coordinates_starting)
+
+                        except (ValueError, TypeError, KeyError) as e:
+                            await self.send_error_message(f"GPS/Totalizer parsing error: {e}")
+                            return
                     # Forward to DB update
                     result = await self.update_transaction_log(data)
                     request_status_result = await self.update_request_status_from_status_code(transaction_id, imei, status)
@@ -454,6 +489,55 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
 
     @database_sync_to_async
+    def save_totalizer_and_gps_starting_with_validation(self, transaction_id, imei, totalizer_vol, totalizer_price, gps_data):
+        try:
+            txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
+        except RequestFuelDispensingDetails.DoesNotExist:
+            print(f"[ERROR] TXN not found: {transaction_id}")
+            return
+
+        if txn.dispenser_imeinumber != imei:
+            print(f"[IMEI MISMATCH] {imei} != {txn.dispenser_imeinumber}")
+            return
+
+        # 1. Get dispenser_gun_mapping_id of this txn
+        dispenser_gun_mapping_id = txn.dispenser_gun_mapping_id
+
+        # 2. Find the last transaction of this dispenser_gun_mapping_id
+        last_txn = (
+            RequestFuelDispensingDetails.objects
+            .filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id)
+            .exclude(id=txn.id)  # exclude current one
+            .order_by("-request_created_at")  # last one
+            .first()
+        )
+
+        # 3. Perform validation
+        totalizer_validation = None
+        if last_txn:
+            if last_txn.totalizer_price_ending == totalizer_price:
+                totalizer_validation = 0
+            else:
+                totalizer_validation = 1
+
+        # 4. Save into current txn
+        txn.totalizer_volume_starting = totalizer_vol
+        txn.totalizer_price_starting = totalizer_price
+        txn.gps_coordinates_starting = gps_data
+        if totalizer_validation is not None:
+            txn.totalizer_validation = totalizer_validation
+
+        txn.save(update_fields=[
+            "totalizer_volume_starting",
+            "totalizer_price_starting",
+            "gps_coordinates_starting",
+            "totalizer_validation"
+        ])
+        print(f"[START DATA SAVED] TXN={transaction_id}, Validation={totalizer_validation}")
+
+
+
+    @database_sync_to_async
     def update_gps_coordinates(self, imei, gps_data: dict, has_fix: bool):
         try:
             dispenser = DispenserUnits.objects.get(imei_number=imei)
@@ -482,7 +566,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
 
     @database_sync_to_async
-    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time):
+    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time,gvr_money,gvr_volume):
         try:
             txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
         except RequestFuelDispensingDetails.DoesNotExist:
@@ -497,12 +581,16 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         txn.dispenser_received_price = money
         txn.dispense_end_time = dispense_time
         txn.dispense_time_taken = fuel_time
+        txn.totalizer_volume_ending = gvr_volume / 100
+        txn.totalizer_price_ending = gvr_money
         txn.save(update_fields=[
             "dispenser_live_price",
             "dispenser_received_volume",
             "dispenser_received_price",
             "dispense_end_time",
             "dispense_time_taken",
+            "totalizer_volume_ending",
+            "totalizer_price_ending"
         ])
         print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
         return {"success": True,"request_status": txn.request_status}
