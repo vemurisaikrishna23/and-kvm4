@@ -512,20 +512,26 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             .first()
         )
 
-        # 3. Perform validation
-        totalizer_validation = None
-        if last_txn:
+        # Handle validation logic
+        if last_txn is None:
+            # No previous txn → assume OK
+            totalizer_validation = 0
+            print(f"[VALIDATION] No previous transaction found → Marked valid (0)")
+        else:
             if last_txn.totalizer_price_ending == totalizer_price:
                 totalizer_validation = 0
+                print(f"[VALIDATION] Matched ending={last_txn.totalizer_price_ending} == starting={totalizer_price}")
             else:
                 totalizer_validation = 1
+                print(f"[VALIDATION MISMATCH] ending={last_txn.totalizer_price_ending} != starting={totalizer_price}")
+
+
 
         # 4. Save into current txn
         txn.totalizer_volume_starting = totalizer_vol
         txn.totalizer_price_starting = totalizer_price
         txn.gps_coordinates_starting = gps_data
-        if totalizer_validation is not None:
-            txn.totalizer_validation = totalizer_validation
+        txn.totalizer_validation = totalizer_validation
 
         txn.save(update_fields=[
             "totalizer_volume_starting",
