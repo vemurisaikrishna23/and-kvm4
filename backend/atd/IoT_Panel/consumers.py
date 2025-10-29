@@ -332,7 +332,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                             alt_m = 0.0 if data["alt_m"] is None else float(data["alt_m"])
 
                             gps_coordinates_starting = {
-                                "epoch" = int(data["epoch"]),
+                                "epoch" : int(data["epoch"]),
                                 "lat": lat,
                                 "lon": lon,
                                 "alt_m": alt_m,
