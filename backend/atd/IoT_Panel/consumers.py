@@ -297,7 +297,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     ]
 
                     if data.get("status") == 200:
-                        required_fields += ["gvr_amount", "gvr_volume","time_utc", "lat", "lon", "alt_m", "sats_used", "speed_kmh", "course_deg"]
+                        required_fields += ["gvr_money", "gvr_volume","epoch", "lat", "lon", "alt_m", "sats_used", "speed_kmh", "course_deg"]
                     missing_fields = [f for f in required_fields if f not in data]
                     if missing_fields:
                         await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
@@ -324,7 +324,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     if status == 200:
                         try:
                             totalizer_volume_starting = float(data["gvr_volume"]/100)
-                            totalizer_price_starting = float(data["gvr_amount"])
+                            totalizer_price_starting = float(data["gvr_money"])
 
                             # GPS fallbacks
                             lat = 0.0 if data["lat"] is None else float(data["lat"])
@@ -332,7 +332,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                             alt_m = 0.0 if data["alt_m"] is None else float(data["alt_m"])
 
                             gps_coordinates_starting = {
-                                "time_utc": str(data["time_utc"]),
+                                "epoch" = int(data["epoch"]),
                                 "lat": lat,
                                 "lon": lon,
                                 "alt_m": alt_m,
