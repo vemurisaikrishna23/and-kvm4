@@ -148,7 +148,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     print(f"[HARDWARE MESSAGE] Received from IMEI {imei}: {status}")
                     await self.update_machine_status(imei, status)
                     await self.update_connectivity(imei, "online")
-                
+                    print(f"conenctivity status updated")
                 elif msg_type == 51:
                     imei = data.get("imei")
                     price_status = data.get("price_update_status")
