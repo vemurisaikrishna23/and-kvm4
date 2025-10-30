@@ -162,13 +162,24 @@ REST_FRAMEWORK = {
 
 
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('178.16.137.196', 6379)],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": ["redis://:Myaccess2021@178.16.137.196:6379/0"],
+            # You can also use a list of tuples for hosts if needed:
+            # "hosts": [("redis://:your_redis_password@127.0.0.1", 6379)],
         },
     },
-}   
+}
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [('178.16.137.196', 6379)],
+#         },
+#     },
+# }   
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=144000),
