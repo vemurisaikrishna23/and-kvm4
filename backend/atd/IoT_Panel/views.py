@@ -11,6 +11,7 @@ from .renderers import *
 import hashlib
 from django.db.models import Q
 
+from datetime import datetime
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -1028,6 +1029,33 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                         {"error": "User is not associated with any customer."},
                         status=status.HTTP_403_FORBIDDEN
                     )
+                        # Passed validation
+            qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
+
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+
+            if start_date_str:
+                try:
+                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                qs = qs.filter(request_created_at__date__gte=start_date)
+
+            if end_date_str:
+                try:
+                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                qs = qs.filter(request_created_at__date__lte=end_date)
+
+
 
             # Passed validation
             fuel_dispensing_requests = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id).order_by('-request_created_at')
@@ -1556,3 +1584,5 @@ class DeleteVINVehicle(APIView):
         )
 
         
+
+
