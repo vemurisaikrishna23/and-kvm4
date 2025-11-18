@@ -1004,7 +1004,7 @@ class GetFuelDispensingRequests(APIView):
             return Response({"error": "You are not authorized to get fuel dispensing requests"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Fuel Dispensing Requests by Customer ID
+# Get Fuel Dispensing Requests by Customer ID
 class GetFuelDispensingRequestsByCustomerID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1013,6 +1013,7 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
+
         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
 
             if 'Accounts Admin' in roles:
@@ -1029,9 +1030,11 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                         {"error": "User is not associated with any customer."},
                         status=status.HTTP_403_FORBIDDEN
                     )
-                        # Passed validation
+
+            # Base queryset
             qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
 
+            # Optional date filters
             start_date_str = request.query_params.get('start_date')
             end_date_str = request.query_params.get('end_date')
 
@@ -1055,10 +1058,8 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                     )
                 qs = qs.filter(request_created_at__date__lte=end_date)
 
-
-
-            # Passed validation
-            fuel_dispensing_requests = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id).order_by('-request_created_at')
+            # Now use the filtered queryset
+            fuel_dispensing_requests = qs.order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
