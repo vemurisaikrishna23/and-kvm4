@@ -10,7 +10,7 @@ from existing_tables.models import *
 from .renderers import *
 import hashlib
 from django.db.models import Q
-
+import time
 from datetime import datetime
 
 def get_tokens_for_user(user):
@@ -1005,7 +1005,6 @@ class GetFuelDispensingRequests(APIView):
 
 
 # Get Fuel Dispensing Requests by Customer ID
-# Get Fuel Dispensing Requests by Customer ID
 class GetFuelDispensingRequestsByCustomerID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1014,14 +1013,6 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-
-        # --- DEBUG START ---
-        print("==== GetFuelDispensingRequestsByCustomerID ====")
-        print("User ID:", user_id)
-        print("Roles:", roles)
-        print("Customer ID (param):", customer_id)
-        print("Query params:", dict(request.query_params))
-        # --- DEBUG END ---
 
         if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
 
@@ -1042,45 +1033,29 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
 
             # Base queryset for this customer
             qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
-            print("Base queryset count:", qs.count())
 
             start_date_str = request.query_params.get('start_date')
             end_date_str = request.query_params.get('end_date')
 
-            # DEBUG: show raw dates
-            print("start_date_str:", start_date_str)
-            print("end_date_str:", end_date_str)
-
             if start_date_str:
                 try:
                     start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-                    start_dt = datetime.combine(start_date, time.min)
                 except ValueError:
                     return Response(
                         {"error": "Invalid start_date format. Use YYYY-MM-DD."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                qs = qs.filter(request_created_at__gte=start_dt)
-                print("After start_date filter count:", qs.count())
+                qs = qs.filter(request_created_at__date__gte=start_date)
 
             if end_date_str:
                 try:
                     end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-                    end_dt = datetime.combine(end_date, time.max)
                 except ValueError:
                     return Response(
                         {"error": "Invalid end_date format. Use YYYY-MM-DD."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                qs = qs.filter(request_created_at__lte=end_dt)
-                print("After end_date filter count:", qs.count())
-
-            # Final debug: show some records
-            print("Final queryset count:", qs.count())
-            print(
-                "Sample IDs and dates:",
-                list(qs.values_list("id", "request_created_at")[:5])
-            )
+                qs = qs.filter(request_created_at__date__lte=end_date)
 
             fuel_dispensing_requests = qs.order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
@@ -1091,6 +1066,7 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                 {"error": "You are not authorized to get fuel dispensing requests."},
                 status=status.HTTP_403_FORBIDDEN
             )
+
 
 
 #Get Fuel Dispensing Requests by Dispenser Gun Mapping ID
