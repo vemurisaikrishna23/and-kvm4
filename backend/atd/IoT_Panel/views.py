@@ -11,7 +11,7 @@ from .renderers import *
 import hashlib
 from django.db.models import Q
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -1037,25 +1037,24 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
             start_date_str = request.query_params.get('start_date')
             end_date_str = request.query_params.get('end_date')
 
+
             if start_date_str:
                 try:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+                    start_dt = datetime.combine(start_date, datetime.min.time())
+                    qs = qs.filter(request_created_at__gte=start_dt)
                 except ValueError:
-                    return Response(
-                        {"error": "Invalid start_date format. Use YYYY-MM-DD."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                qs = qs.filter(request_created_at__date__gte=start_date)
+                    return Response({"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
             if end_date_str:
                 try:
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+                    end_dt = datetime.combine(end_date, datetime.max.time())
+                    qs = qs.filter(request_created_at__lte=end_dt)
                 except ValueError:
-                    return Response(
-                        {"error": "Invalid end_date format. Use YYYY-MM-DD."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                qs = qs.filter(request_created_at__date__lte=end_date)
+                    return Response({"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
             fuel_dispensing_requests = qs.order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
