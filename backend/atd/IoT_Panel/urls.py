@@ -65,6 +65,10 @@ urlpatterns = [
     path("vin-vehicle/edit/<int:vin_id>/", EditVINVehicle.as_view(), name="edit-vin-vehicle"),
     path("vin-vehicle/delete/<int:vin_id>/", DeleteVINVehicle.as_view(), name="delete-vin-vehicle"),
 
+    path("dashboard/consumption/<int:customer_id>/", ConsumptionPageDashBoardView.as_view(), name="consumption page"),
+    path("dashboard/reconsiliance/<int:customer_id>/", DailyReconciliationDashBoardView.as_view(), name="reconsiliance page"),
+    path("dashboard/overview/<int:customer_id>/", OverviewDashboard.as_view(), name="overview page"),
 
 ]
+
 

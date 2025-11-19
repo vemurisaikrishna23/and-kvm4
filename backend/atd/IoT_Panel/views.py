@@ -9,7 +9,7 @@ from .serializers import *
 from existing_tables.models import *
 from .renderers import *
 import hashlib
-from django.db.models import Q
+from django.db.models import Q, Sum, Count
 import time
 from datetime import datetime, timedelta
 
@@ -1005,8 +1005,69 @@ class GetFuelDispensingRequests(APIView):
 
 
 # Get Fuel Dispensing Requests by Customer ID
+# class GetFuelDispensingRequestsByCustomerID(APIView):
+#     renderer_classes = [IoT_PanelRenderer]
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, customer_id, format=None):
+#         user = request.user
+#         user_id = getattr(user, "id", None)
+#         roles = get_user_roles(user_id)
+
+#         if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
+
+#             if 'Accounts Admin' in roles:
+#                 # Accounts Admin can fetch only their associated customer's data
+#                 try:
+#                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
+#                     if str(poc.belong_to_id) != str(customer_id):
+#                         return Response(
+#                             {"error": "You are not authorized to view this customer's fuel dispensing requests."},
+#                             status=status.HTTP_403_FORBIDDEN
+#                         )
+#                 except PointOfContacts.DoesNotExist:
+#                     return Response(
+#                         {"error": "User is not associated with any customer."},
+#                         status=status.HTTP_403_FORBIDDEN
+#                     )
+
+#             # Base queryset for this customer
+#             qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
+
+#             start_date_str = request.query_params.get('start_date')
+#             end_date_str = request.query_params.get('end_date')
+
+
+#             if start_date_str:
+#                 try:
+#                     start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+#                     start_dt = datetime.combine(start_date, datetime.min.time())
+#                     qs = qs.filter(request_created_at__gte=start_dt)
+#                 except ValueError:
+#                     return Response({"error": "Invalid start_date format. Use YYYY-MM-DD."},
+#                                     status=status.HTTP_400_BAD_REQUEST)
+
+#             if end_date_str:
+#                 try:
+#                     end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+#                     end_dt = datetime.combine(end_date, datetime.max.time())
+#                     qs = qs.filter(request_created_at__lte=end_dt)
+#                 except ValueError:
+#                     return Response({"error": "Invalid end_date format. Use YYYY-MM-DD."},
+#                                     status=status.HTTP_400_BAD_REQUEST)
+
+#             fuel_dispensing_requests = qs.order_by('-request_created_at')
+#             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
+#             return Response(serializer.data, status=status.HTTP_200_OK)
+
+#         else:
+#             return Response(
+#                 {"error": "You are not authorized to get fuel dispensing requests."},
+#                 status=status.HTTP_403_FORBIDDEN
+#             )
+
+
 class GetFuelDispensingRequestsByCustomerID(APIView):
-    renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, customer_id, format=None):
@@ -1014,59 +1075,132 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
+        # --------------------------------------------------------------------------------
+        # ROLE VALIDATION
+        # --------------------------------------------------------------------------------
+        allowed_roles = [
+            'IOT Admin', 'Accounts Admin', 'Dispenser Manager',
+            'Location Manager', 'Dispenser'
+        ]
 
-            if 'Accounts Admin' in roles:
-                # Accounts Admin can fetch only their associated customer's data
-                try:
-                    poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
-                    if str(poc.belong_to_id) != str(customer_id):
-                        return Response(
-                            {"error": "You are not authorized to view this customer's fuel dispensing requests."},
-                            status=status.HTTP_403_FORBIDDEN
-                        )
-                except PointOfContacts.DoesNotExist:
-                    return Response(
-                        {"error": "User is not associated with any customer."},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-
-            # Base queryset for this customer
-            qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
-
-            start_date_str = request.query_params.get('start_date')
-            end_date_str = request.query_params.get('end_date')
-
-
-            if start_date_str:
-                try:
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-                    start_dt = datetime.combine(start_date, datetime.min.time())
-                    qs = qs.filter(request_created_at__gte=start_dt)
-                except ValueError:
-                    return Response({"error": "Invalid start_date format. Use YYYY-MM-DD."},
-                                    status=status.HTTP_400_BAD_REQUEST)
-
-            if end_date_str:
-                try:
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-                    end_dt = datetime.combine(end_date, datetime.max.time())
-                    qs = qs.filter(request_created_at__lte=end_dt)
-                except ValueError:
-                    return Response({"error": "Invalid end_date format. Use YYYY-MM-DD."},
-                                    status=status.HTTP_400_BAD_REQUEST)
-
-            fuel_dispensing_requests = qs.order_by('-request_created_at')
-            serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        else:
+        if not any(role in roles for role in allowed_roles):
             return Response(
                 {"error": "You are not authorized to get fuel dispensing requests."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        # --------------------------------------------------------------------------------
+        # ACCOUNTS ADMIN CAN ONLY ACCESS THEIR CUSTOMER
+        # --------------------------------------------------------------------------------
+        if 'Accounts Admin' in roles:
+            try:
+                poc = PointOfContacts.objects.get(
+                    user_id=user_id, belong_to_type="customer"
+                )
+                if str(poc.belong_to_id) != str(customer_id):
+                    return Response(
+                        {"error": "You are not authorized to view this customer's fuel dispensing requests."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except PointOfContacts.DoesNotExist:
+                return Response(
+                    {"error": "User is not associated with any customer."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
+        # --------------------------------------------------------------------------------
+        # BASE QUERYSET
+        # --------------------------------------------------------------------------------
+        qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
+
+        # --------------------------------------------------------------------------------
+        # DISPENSER MANAGER LOGIC
+        # --------------------------------------------------------------------------------
+        if 'Dispenser Manager' in roles:
+
+            # 1. Fetch customers assigned to this manager
+            manager_customers = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id,
+                    belong_to_type="customer"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            # 2. Get dispenser-gun mappings for these customers
+            assigned_dispensers = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer__in=manager_customers
+                ).values_list("dispenser_unit_id", flat=True)
+            )
+
+            # 3. Filter transactions belonging to those dispensers
+            qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
+
+        # --------------------------------------------------------------------------------
+        # LOCATION MANAGER LOGIC
+        # --------------------------------------------------------------------------------
+        # -------------------------------------------------------------------------
+# LOCATION MANAGER LOGIC (IMPROVED + FULLY CORRECT)
+# -------------------------------------------------------------------------
+        if 'Location Manager' in roles:
+
+            # 1. Manager assigned locations from POC table
+            assigned_locations_raw = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id,
+                    belong_to_type="delivery_location"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            # Normalize to integers
+            assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
+
+            # Build the filter
+            location_filter = Q()
+
+            # Condition 1: direct delivery location match
+            location_filter |= Q(delivery_location_id__in=assigned_locations)
+
+            # Condition 2: DU Accessible Locations (JSON list)
+            for loc in assigned_locations:
+                location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
+
+            qs = qs.filter(location_filter).distinct()
+
+
+        # --------------------------------------------------------------------------------
+        # DATE FILTERS
+        # --------------------------------------------------------------------------------
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+                qs = qs.filter(request_created_at__gte=start_date)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+                end_dt = datetime.combine(end_date, datetime.max.time())
+                qs = qs.filter(request_created_at__lte=end_dt)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # --------------------------------------------------------------------------------
+        # FINAL RESPONSE
+        # --------------------------------------------------------------------------------
+        qs = qs.order_by('-request_created_at')
+        serializer = GetFuelDispensingRequestsSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 #Get Fuel Dispensing Requests by Dispenser Gun Mapping ID
 class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
@@ -1196,6 +1330,592 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
 #             return Response(serializer.data, status=status.HTTP_200_OK)
 #         else:
 #             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+class ConsumptionPageDashBoardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # ----------------------------------------------------------------------
+        # BASE QUERYSET
+        # ----------------------------------------------------------------------
+        qs = RequestFuelDispensingDetails.objects.filter(
+            customer_id=customer_id,
+            dispenser_received_volume__isnull=False
+        )
+
+        # ----------------------------------------------------------------------
+        # DATE FILTERS
+        # ----------------------------------------------------------------------
+        start_date_str = request.query_params.get("start_date")
+        end_date_str = request.query_params.get("end_date")
+
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+                qs = qs.filter(request_created_at__gte=start_date)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid start_date format. Use YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+                end_dt = datetime.combine(end_date, datetime.max.time())
+                qs = qs.filter(request_created_at__lte=end_dt)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid end_date format. Use YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # ----------------------------------------------------------------------
+        # ROLE FILTERING — SAME LOGIC FOR BOTH SECTIONS
+        # ----------------------------------------------------------------------
+
+        # ACCOUNTS ADMIN
+        if "Accounts Admin" in roles:
+            try:
+                poc = PointOfContacts.objects.get(
+                    user_id=user_id,
+                    belong_to_type="customer"
+                )
+                if str(poc.belong_to_id) != str(customer_id):
+                    return Response(
+                        {"error": "Not authorized for this customer"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except PointOfContacts.DoesNotExist:
+                return Response(
+                    {"error": "User is not linked to any customer"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # DISPENSER MANAGER
+        if "Dispenser Manager" in roles:
+
+            assigned_customers = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id,
+                    belong_to_type="customer"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            assigned_dispensers = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer__in=assigned_customers
+                ).values_list("id", flat=True)
+            )
+
+            qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
+
+        # LOCATION MANAGER
+        if "Location Manager" in roles:
+
+            assigned_locations_raw = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id,
+                    belong_to_type="delivery_location"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
+
+            location_filter = Q(delivery_location_id__in=assigned_locations)
+
+            for loc in assigned_locations:
+                location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
+
+            qs = qs.filter(location_filter).distinct()
+
+        # ----------------------------------------------------------------------
+        # 1️⃣ CONSUMING ASSETS
+        # ----------------------------------------------------------------------
+        asset_rows = (
+            qs.values("asset_id", "asset_name")
+            .annotate(
+                total_volume=Sum("dispenser_received_volume"),
+                txn_count=Count("id")
+            )
+            .order_by("-total_volume")[:10]
+        )
+
+        consuming_assets = []
+        rank = 1
+        for row in asset_rows:
+            volume = row["total_volume"] or 0
+            tx = row["txn_count"] or 0
+            avg = volume / tx if tx > 0 else 0
+
+            consuming_assets.append({
+                "rank": rank,
+                "asset_id": row["asset_id"],
+                "asset_name": row["asset_name"],
+                "consumption_liters": round(volume, 2),
+                "transactions": tx,
+                "avg_per_transaction": round(avg, 2)
+            })
+            rank += 1
+
+        # ----------------------------------------------------------------------
+        # 2️⃣ CONSUMING USERS
+        # ----------------------------------------------------------------------
+        user_rows = (
+            qs.values("user_id", "user_name")
+            .annotate(
+                total_volume=Sum("dispenser_received_volume"),
+                txn_count=Count("id")
+            )
+            .order_by("-total_volume")[:10]
+        )
+
+        consuming_users = []
+        rank = 1
+        for row in user_rows:
+            volume = row["total_volume"] or 0
+            tx = row["txn_count"] or 0
+            avg = volume / tx if tx > 0 else 0
+
+            consuming_users.append({
+                "rank": rank,
+                "user_id": row["user_id"],
+                "user_name": row["user_name"],
+                "consumption_liters": round(volume, 2),
+                "transactions": tx,
+                "avg_per_transaction": round(avg, 2)
+            })
+            rank += 1
+
+        # ----------------------------------------------------------------------
+        # FINAL RESPONSE
+        # ----------------------------------------------------------------------
+        return Response({
+            "consuming_assets": consuming_assets,
+            "consuming_users": consuming_users
+        }, status=status.HTTP_200_OK)
+
+
+
+class DailyReconciliationDashBoardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # ----------------------------------------------------------
+        # DATE RANGE
+        # ----------------------------------------------------------
+        start_date_str = request.query_params.get("start_date")
+        end_date_str = request.query_params.get("end_date")
+
+        if not start_date_str or not end_date_str:
+            return Response(
+                {"error": "start_date and end_date required"},
+                status=400
+            )
+
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except:
+            return Response({"error": "Invalid date"}, status=400)
+
+        # ----------------------------------------------------------
+        # BASE QUERYSET
+        # ----------------------------------------------------------
+        qs = RequestFuelDispensingDetails.objects.filter(
+            customer_id=customer_id,
+            request_created_at__date__gte=start_date,
+            request_created_at__date__lte=end_date
+        )
+
+        # ----------------------------------------------------------
+        # ROLE FILTERING
+        # ----------------------------------------------------------
+
+        # ACCOUNTS ADMIN
+        if "Accounts Admin" in roles:
+            try:
+                poc = PointOfContacts.objects.get(
+                    user_id=user_id,
+                    belong_to_type="customer"
+                )
+                if str(poc.belong_to_id) != str(customer_id):
+                    return Response({"error": "Not authorized"}, status=403)
+            except PointOfContacts.DoesNotExist:
+                return Response({"error": "Not authorized"}, status=403)
+
+        # DISPENSER MANAGER
+        if "Dispenser Manager" in roles:
+            assigned_customers = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id,
+                    belong_to_type="customer"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            assigned_dispensers = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer__in=assigned_customers
+                ).values_list("id", flat=True)
+            )
+
+            qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
+
+        # LOCATION MANAGER
+        if "Location Manager" in roles:
+            assigned_locations_raw = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id,
+                    belong_to_type="delivery_location"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
+
+            location_filter = Q(delivery_location_id__in=assigned_locations)
+
+            for loc in assigned_locations:
+                location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
+
+            qs = qs.filter(location_filter).distinct()
+
+        # ----------------------------------------------------------
+        # RECONCILIATION PROCESS
+        # ----------------------------------------------------------
+        results = []
+
+        # Group by dispenser
+        dispensers = qs.values(
+            "dispenser_gun_mapping_id",
+            "dispenser_serialnumber",
+        ).distinct()
+
+        for disp in dispensers:
+            disp_id = disp["dispenser_gun_mapping_id"]
+            serial = disp["dispenser_serialnumber"]
+
+            current_date = start_date
+            while current_date <= end_date:
+
+                daily_qs = qs.filter(
+                    dispenser_gun_mapping_id=disp_id,
+                    request_created_at__date=current_date
+                ).order_by("request_created_at")
+
+                if daily_qs.exists():
+
+                    # Opening
+                    first_rec = daily_qs.first()
+                    opening = first_rec.totalizer_volume_starting or 0
+
+                    # Closing
+                    last_rec = daily_qs.last()
+                    closing = last_rec.totalizer_volume_ending
+
+                    if closing is None:
+                        last_non_null = daily_qs.filter(
+                            totalizer_volume_ending__isnull=False
+                        ).order_by("-request_created_at").first()
+
+                        if last_non_null:
+                            closing = last_non_null.totalizer_volume_ending
+                        else:
+                            closing = opening
+
+                    # Total dispensed
+                    total_dispensed = round(closing - opening, 2)
+
+                    # Approved volume
+                    approved = (
+                        daily_qs.aggregate(total=Sum("dispenser_received_volume")).get("total") or 0
+                    )
+
+                    variance = round(total_dispensed - approved, 2)
+
+                    status_label = "Reconciled" if variance == 0 else "Variance"
+
+                    results.append({
+                        "date": str(current_date),
+                        "dispenser_id": disp_id,
+                        "dispenser_serialnumber": serial,
+                        "opening_reading": round(opening, 2),
+                        "closing_reading": round(closing, 2),
+                        "total_dispensed": round(total_dispensed, 2),
+                        "approved_volume": round(approved, 2),
+                        "variance": variance,
+                        "status": status_label
+                    })
+
+                current_date += timedelta(days=1)
+
+        return Response(results, status=200)
+
+
+# class OverviewDashboard(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, customer_id, format=None):
+#         user = request.user
+#         user_id = getattr(user, "id", None)
+#         roles = get_user_roles(user_id)
+
+#         # -------------------------------------------------------------------
+#         # BASE QUERYSET
+#         # -------------------------------------------------------------------
+#         qs = RequestFuelDispensingDetails.objects.filter(
+#             customer_id=customer_id
+#         )
+
+#         # -------------------------------------------------------------------
+#         # ROLE FILTERING
+#         # -------------------------------------------------------------------
+
+#         # ACCOUNTS ADMIN
+#         if "Accounts Admin" in roles:
+#             try:
+#                 poc = PointOfContacts.objects.get(
+#                     user_id=user_id, belong_to_type="customer"
+#                 )
+#                 if str(poc.belong_to_id) != str(customer_id):
+#                     return Response({"error": "Not authorized"}, status=403)
+#             except PointOfContacts.DoesNotExist:
+#                 return Response({"error": "Not authorized"}, status=403)
+
+#         # DISPENSER MANAGER
+#         if "Dispenser Manager" in roles:
+
+#             # Get customers mapped to manager
+#             assigned_customers = list(
+#                 PointOfContacts.objects.filter(
+#                     user_id=user_id, belong_to_type="customer"
+#                 ).values_list("belong_to_id", flat=True)
+#             )
+
+#             # Get dispenser units for those customers
+#             assigned_dispensers = list(
+#                 Dispenser_Gun_Mapping_To_Customer.objects.filter(
+#                     customer__in=assigned_customers
+#                 ).values_list("id", flat=True)
+#             )
+
+#             # Filter transactions
+#             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
+
+#         # LOCATION MANAGER
+#         if "Location Manager" in roles:
+
+#             # Locations assigned to this manager
+#             assigned_locations_raw = list(
+#                 PointOfContacts.objects.filter(
+#                     user_id=user_id, belong_to_type="delivery_location"
+#                 ).values_list("belong_to_id", flat=True)
+#             )
+
+#             assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
+
+#             location_filter = Q(delivery_location_id__in=assigned_locations)
+
+#             for loc in assigned_locations:
+#                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
+
+#             qs = qs.filter(location_filter).distinct()
+
+#         # -------------------------------------------------------------------
+#         # AGGREGATED DATA
+#         # -------------------------------------------------------------------
+
+#         total_transactions = qs.count()
+
+#         agg = qs.aggregate(
+#             total_volume=Sum("dispenser_received_volume"),
+#             total_price=Sum("dispenser_received_price")
+#         )
+
+#         total_volume_dispensed = agg["total_volume"] or 0
+#         total_price_dispensed = agg["total_price"] or 0
+
+#         # Total assets = unique asset_id
+#         total_assets = qs.values("asset_id").distinct().count()
+
+#         # -------------------------------------------------------------------
+#         # FINAL RESPONSE
+#         # -------------------------------------------------------------------
+#         return Response({
+#             "total_transactions": total_transactions,
+#             "total_volume_dispensed": round(total_volume_dispensed, 2),
+#             "total_price_dispensed": round(total_price_dispensed, 2),
+#             "total_assets": total_assets
+#         }, status=200)
+
+
+from django.db.models import Q, Sum, Count
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import datetime, timedelta
+
+
+class OverviewDashboard(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        # ----------------------------------------------------------
+        # DATE FILTERS (optional but recommended for daywise logs)
+        # ----------------------------------------------------------
+        start_date_str = request.query_params.get("start_date")
+        end_date_str = request.query_params.get("end_date")
+
+        if start_date_str and end_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD"},
+                    status=400
+                )
+        else:
+            # Default: Last 15 days
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=14)
+
+        # ----------------------------------------------------------
+        # BASE QUERYSET
+        # ----------------------------------------------------------
+        qs = RequestFuelDispensingDetails.objects.filter(
+            customer_id=customer_id,
+            request_created_at__date__gte=start_date,
+            request_created_at__date__lte=end_date
+        )
+
+        # ----------------------------------------------------------
+        # ROLE FILTERING
+        # ----------------------------------------------------------
+
+        # ACCOUNTS ADMIN
+        if "Accounts Admin" in roles:
+            try:
+                poc = PointOfContacts.objects.get(
+                    user_id=user_id, belong_to_type="customer"
+                )
+                if str(poc.belong_to_id) != str(customer_id):
+                    return Response({"error": "Not authorized"}, status=403)
+            except PointOfContacts.DoesNotExist:
+                return Response({"error": "Not authorized"}, status=403)
+
+        # DISPENSER MANAGER
+        if "Dispenser Manager" in roles:
+
+            assigned_customers = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id, belong_to_type="customer"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            assigned_dispensers = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer__in=assigned_customers
+                ).values_list("id", flat=True)
+            )
+
+            qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
+
+        # LOCATION MANAGER
+        if "Location Manager" in roles:
+
+            assigned_locations_raw = list(
+                PointOfContacts.objects.filter(
+                    user_id=user_id, belong_to_type="delivery_location"
+                ).values_list("belong_to_id", flat=True)
+            )
+
+            assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
+
+            location_filter = Q(delivery_location_id__in=assigned_locations)
+            for loc in assigned_locations:
+                location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
+
+            qs = qs.filter(location_filter).distinct()
+
+        # ----------------------------------------------------------
+        # AGGREGATED OVERVIEW (TOP BLOCK)
+        # ----------------------------------------------------------
+
+        total_transactions = qs.count()
+
+        agg = qs.aggregate(
+            total_volume=Sum("dispenser_received_volume"),
+            total_price=Sum("dispenser_received_price")
+        )
+
+        total_volume_dispensed = agg["total_volume"] or 0
+        total_price_dispensed = agg["total_price"] or 0
+
+        total_assets = qs.values("asset_id").distinct().count()
+
+        # ----------------------------------------------------------
+        # FUEL AMOUNT CONSUMPTION (DAYWISE LOG)
+        # ----------------------------------------------------------
+
+        fuel_amount_consumption = []
+        current_date = start_date
+
+        grand_total_volume = 0
+        grand_total_price = 0
+
+        while current_date <= end_date:
+
+            day_qs = qs.filter(request_created_at__date=current_date)
+
+            if day_qs.exists():
+                day_volume = (
+                    day_qs.aggregate(v=Sum("dispenser_received_volume")).get("v") or 0
+                )
+                day_price = (
+                    day_qs.aggregate(p=Sum("dispenser_received_price")).get("p") or 0
+                )
+
+                grand_total_volume += day_volume
+                grand_total_price += day_price
+
+                fuel_amount_consumption.append({
+                    "date": str(current_date),
+                    "total_volume_dispensed": round(day_volume, 2),
+                    "total_price_dispensed": round(day_price, 2)
+                })
+
+            current_date += timedelta(days=1)
+
+        # ----------------------------------------------------------
+        # FINAL PAYLOAD
+        # ----------------------------------------------------------
+        return Response({
+            "total_transactions": total_transactions,
+            "total_volume_dispensed": round(total_volume_dispensed, 2),
+            "total_price_dispensed": round(total_price_dispensed, 2),
+            "total_assets": total_assets,
+
+            "fuel_amount_consumption": {
+                "daywise": fuel_amount_consumption,
+                "grand_total_volume": round(grand_total_volume, 2),
+                "grand_total_price": round(grand_total_price, 2)
+            }
+
+        }, status=200)
 
 
 #Get Fuel Dispensing Requests by Asset ID
