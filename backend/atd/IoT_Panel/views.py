@@ -1661,6 +1661,7 @@ class DailyReconciliationDashBoardView(APIView):
         return Response(results, status=200)
 
 
+
 # class OverviewDashboard(APIView):
 #     permission_classes = [IsAuthenticated]
 
@@ -1669,16 +1670,38 @@ class DailyReconciliationDashBoardView(APIView):
 #         user_id = getattr(user, "id", None)
 #         roles = get_user_roles(user_id)
 
-#         # -------------------------------------------------------------------
+#         # ----------------------------------------------------------
+#         # DATE FILTERS (optional but recommended for daywise logs)
+#         # ----------------------------------------------------------
+#         start_date_str = request.query_params.get("start_date")
+#         end_date_str = request.query_params.get("end_date")
+
+#         if start_date_str and end_date_str:
+#             try:
+#                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+#                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+#             except ValueError:
+#                 return Response(
+#                     {"error": "Invalid date format. Use YYYY-MM-DD"},
+#                     status=400
+#                 )
+#         else:
+#             # Default: Last 15 days
+#             end_date = datetime.now().date()
+#             start_date = end_date - timedelta(days=14)
+
+#         # ----------------------------------------------------------
 #         # BASE QUERYSET
-#         # -------------------------------------------------------------------
+#         # ----------------------------------------------------------
 #         qs = RequestFuelDispensingDetails.objects.filter(
-#             customer_id=customer_id
+#             customer_id=customer_id,
+#             request_created_at__date__gte=start_date,
+#             request_created_at__date__lte=end_date
 #         )
 
-#         # -------------------------------------------------------------------
+#         # ----------------------------------------------------------
 #         # ROLE FILTERING
-#         # -------------------------------------------------------------------
+#         # ----------------------------------------------------------
 
 #         # ACCOUNTS ADMIN
 #         if "Accounts Admin" in roles:
@@ -1694,27 +1717,23 @@ class DailyReconciliationDashBoardView(APIView):
 #         # DISPENSER MANAGER
 #         if "Dispenser Manager" in roles:
 
-#             # Get customers mapped to manager
 #             assigned_customers = list(
 #                 PointOfContacts.objects.filter(
 #                     user_id=user_id, belong_to_type="customer"
 #                 ).values_list("belong_to_id", flat=True)
 #             )
 
-#             # Get dispenser units for those customers
 #             assigned_dispensers = list(
 #                 Dispenser_Gun_Mapping_To_Customer.objects.filter(
 #                     customer__in=assigned_customers
 #                 ).values_list("id", flat=True)
 #             )
 
-#             # Filter transactions
 #             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
 
 #         # LOCATION MANAGER
 #         if "Location Manager" in roles:
 
-#             # Locations assigned to this manager
 #             assigned_locations_raw = list(
 #                 PointOfContacts.objects.filter(
 #                     user_id=user_id, belong_to_type="delivery_location"
@@ -1724,15 +1743,14 @@ class DailyReconciliationDashBoardView(APIView):
 #             assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
 
 #             location_filter = Q(delivery_location_id__in=assigned_locations)
-
 #             for loc in assigned_locations:
 #                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
 
 #             qs = qs.filter(location_filter).distinct()
 
-#         # -------------------------------------------------------------------
-#         # AGGREGATED DATA
-#         # -------------------------------------------------------------------
+#         # ----------------------------------------------------------
+#         # AGGREGATED OVERVIEW (TOP BLOCK)
+#         # ----------------------------------------------------------
 
 #         total_transactions = qs.count()
 
@@ -1744,17 +1762,56 @@ class DailyReconciliationDashBoardView(APIView):
 #         total_volume_dispensed = agg["total_volume"] or 0
 #         total_price_dispensed = agg["total_price"] or 0
 
-#         # Total assets = unique asset_id
 #         total_assets = qs.values("asset_id").distinct().count()
 
-#         # -------------------------------------------------------------------
-#         # FINAL RESPONSE
-#         # -------------------------------------------------------------------
+#         # ----------------------------------------------------------
+#         # FUEL AMOUNT CONSUMPTION (DAYWISE LOG)
+#         # ----------------------------------------------------------
+
+#         fuel_amount_consumption = []
+#         current_date = start_date
+
+#         grand_total_volume = 0
+#         grand_total_price = 0
+
+#         while current_date <= end_date:
+
+#             day_qs = qs.filter(request_created_at__date=current_date)
+
+#             if day_qs.exists():
+#                 day_volume = (
+#                     day_qs.aggregate(v=Sum("dispenser_received_volume")).get("v") or 0
+#                 )
+#                 day_price = (
+#                     day_qs.aggregate(p=Sum("dispenser_received_price")).get("p") or 0
+#                 )
+
+#                 grand_total_volume += day_volume
+#                 grand_total_price += day_price
+
+#                 fuel_amount_consumption.append({
+#                     "date": str(current_date),
+#                     "total_volume_dispensed": round(day_volume, 2),
+#                     "total_price_dispensed": round(day_price, 2)
+#                 })
+
+#             current_date += timedelta(days=1)
+
+#         # ----------------------------------------------------------
+#         # FINAL PAYLOAD
+#         # ----------------------------------------------------------
 #         return Response({
 #             "total_transactions": total_transactions,
 #             "total_volume_dispensed": round(total_volume_dispensed, 2),
 #             "total_price_dispensed": round(total_price_dispensed, 2),
-#             "total_assets": total_assets
+#             "total_assets": total_assets,
+
+#             "fuel_amount_consumption": {
+#                 "daywise": fuel_amount_consumption,
+#                 "grand_total_volume": round(grand_total_volume, 2),
+#                 "grand_total_price": round(grand_total_price, 2)
+#             }
+
 #         }, status=200)
 
 
@@ -1773,9 +1830,9 @@ class OverviewDashboard(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # ----------------------------------------------------------
-        # DATE FILTERS (optional but recommended for daywise logs)
-        # ----------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # DATE RANGE HANDLING
+        # ----------------------------------------------------------------------
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
 
@@ -1784,46 +1841,40 @@ class OverviewDashboard(APIView):
                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
             except ValueError:
-                return Response(
-                    {"error": "Invalid date format. Use YYYY-MM-DD"},
-                    status=400
-                )
+                return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
         else:
-            # Default: Last 15 days
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=14)
 
-        # ----------------------------------------------------------
+        # ----------------------------------------------------------------------
         # BASE QUERYSET
-        # ----------------------------------------------------------
+        # ----------------------------------------------------------------------
         qs = RequestFuelDispensingDetails.objects.filter(
             customer_id=customer_id,
             request_created_at__date__gte=start_date,
             request_created_at__date__lte=end_date
         )
 
-        # ----------------------------------------------------------
-        # ROLE FILTERING
-        # ----------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # ROLE LOGIC
+        # ----------------------------------------------------------------------
 
         # ACCOUNTS ADMIN
         if "Accounts Admin" in roles:
             try:
-                poc = PointOfContacts.objects.get(
-                    user_id=user_id, belong_to_type="customer"
-                )
+                poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
                 if str(poc.belong_to_id) != str(customer_id):
-                    return Response({"error": "Not authorized"}, status=403)
+                    return Response({"error": "Not authorized for this customer"}, status=403)
             except PointOfContacts.DoesNotExist:
                 return Response({"error": "Not authorized"}, status=403)
 
         # DISPENSER MANAGER
+        assigned_customers = []
+        assigned_dispensers = []
         if "Dispenser Manager" in roles:
-
             assigned_customers = list(
-                PointOfContacts.objects.filter(
-                    user_id=user_id, belong_to_type="customer"
-                ).values_list("belong_to_id", flat=True)
+                PointOfContacts.objects.filter(user_id=user_id, belong_to_type="customer")
+                .values_list("belong_to_id", flat=True)
             )
 
             assigned_dispensers = list(
@@ -1835,8 +1886,8 @@ class OverviewDashboard(APIView):
             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
 
         # LOCATION MANAGER
+        assigned_locations = []
         if "Location Manager" in roles:
-
             assigned_locations_raw = list(
                 PointOfContacts.objects.filter(
                     user_id=user_id, belong_to_type="delivery_location"
@@ -1846,15 +1897,15 @@ class OverviewDashboard(APIView):
             assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
 
             location_filter = Q(delivery_location_id__in=assigned_locations)
+
             for loc in assigned_locations:
                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
 
             qs = qs.filter(location_filter).distinct()
 
-        # ----------------------------------------------------------
-        # AGGREGATED OVERVIEW (TOP BLOCK)
-        # ----------------------------------------------------------
-
+        # ----------------------------------------------------------------------
+        # 1) OVERVIEW STATS
+        # ----------------------------------------------------------------------
         total_transactions = qs.count()
 
         agg = qs.aggregate(
@@ -1862,57 +1913,153 @@ class OverviewDashboard(APIView):
             total_price=Sum("dispenser_received_price")
         )
 
-        total_volume_dispensed = agg["total_volume"] or 0
-        total_price_dispensed = agg["total_price"] or 0
-
+        total_volume_dispensed = round(agg["total_volume"] or 0, 2)
+        total_price_dispensed = round(agg["total_price"] or 0, 2)
         total_assets = qs.values("asset_id").distinct().count()
 
-        # ----------------------------------------------------------
-        # FUEL AMOUNT CONSUMPTION (DAYWISE LOG)
-        # ----------------------------------------------------------
-
-        fuel_amount_consumption = []
-        current_date = start_date
-
+        # ----------------------------------------------------------------------
+        # 2) FUEL & AMOUNT CONSUMPTION (DAYWISE)
+        # ----------------------------------------------------------------------
+        fuel_amount_daywise = []
         grand_total_volume = 0
         grand_total_price = 0
 
+        current_date = start_date
         while current_date <= end_date:
-
             day_qs = qs.filter(request_created_at__date=current_date)
 
             if day_qs.exists():
-                day_volume = (
-                    day_qs.aggregate(v=Sum("dispenser_received_volume")).get("v") or 0
-                )
-                day_price = (
-                    day_qs.aggregate(p=Sum("dispenser_received_price")).get("p") or 0
-                )
+                day_volume = day_qs.aggregate(v=Sum("dispenser_received_volume")).get("v") or 0
+                day_price = day_qs.aggregate(p=Sum("dispenser_received_price")).get("p") or 0
 
                 grand_total_volume += day_volume
                 grand_total_price += day_price
 
-                fuel_amount_consumption.append({
+                fuel_amount_daywise.append({
                     "date": str(current_date),
                     "total_volume_dispensed": round(day_volume, 2),
-                    "total_price_dispensed": round(day_price, 2)
+                    "total_price_dispensed": round(day_price, 2),
                 })
 
             current_date += timedelta(days=1)
 
-        # ----------------------------------------------------------
-        # FINAL PAYLOAD
-        # ----------------------------------------------------------
+        # ----------------------------------------------------------------------
+        # 3) ASSET vs VIN REQUEST COUNT (DAYWISE)
+        # ----------------------------------------------------------------------
+        asset_vin_daywise = []
+        grand_asset_request_count = 0
+        grand_vin_request_count = 0
+
+        current_date = start_date
+        while current_date <= end_date:
+            day_qs = qs.filter(request_created_at__date=current_date)
+
+            if day_qs.exists():
+                asset_requests = day_qs.filter(request_vehicle=0).count()
+                vin_requests = day_qs.filter(request_vehicle=1).count()
+
+                total_day_requests = asset_requests + vin_requests
+
+                grand_asset_request_count += asset_requests
+                grand_vin_request_count += vin_requests
+
+                asset_vin_daywise.append({
+                    "date": str(current_date),
+                    "asset_request_count": asset_requests,
+                    "vin_request_count": vin_requests,
+                    "total_request_count": total_day_requests
+                })
+
+            current_date += timedelta(days=1)
+
+        grand_total_requests = grand_asset_request_count + grand_vin_request_count
+
+        # ----------------------------------------------------------------------
+        # 4) DISPENSER UNIT WISE CONSUMPTION (ALL DISPENSERS)
+        # ----------------------------------------------------------------------
+
+        # Fetch dispensers based on role
+        if "Accounts Admin" in roles:
+            dispenser_list = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer=customer_id
+                ).values("id", "dispenser_unit__serial_number")
+            )
+
+        elif "Dispenser Manager" in roles:
+            dispenser_list = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    customer__in=assigned_customers
+                ).values("id", "dispenser_unit__serial_number")
+            )
+
+        elif "Location Manager" in roles:
+            dispenser_list = list(
+                Dispenser_Gun_Mapping_To_Customer.objects.filter(
+                    Q(deliverylocation_mapping_dispenserunit__delivery_location_id__in=assigned_locations)
+                    |
+                    Q(deliverylocation_mapping_dispenserunit__DU_Accessible_delivery_locations__overlap=assigned_locations)
+                )
+                .values("id", "dispenser_unit__serial_number")
+                .distinct()
+            )
+        else:
+            dispenser_list = []
+
+        dispenser_unit_wise = []
+        grand_dispenser_total_volume = 0
+        grand_dispenser_total_price = 0
+        grand_dispenser_total_transactions = 0
+
+        for disp in dispenser_list:
+            disp_id = disp["id"]
+            serial = disp["dispenser_unit__serial_number"]
+
+            disp_qs = qs.filter(dispenser_gun_mapping_id=disp_id)
+
+            volume = disp_qs.aggregate(v=Sum("dispenser_received_volume")).get("v") or 0
+            price = disp_qs.aggregate(p=Sum("dispenser_received_price")).get("p") or 0
+            tx = disp_qs.count()
+
+            grand_dispenser_total_volume += volume
+            grand_dispenser_total_price += price
+            grand_dispenser_total_transactions += tx
+
+            dispenser_unit_wise.append({
+                "dispenser_id": disp_id,
+                "dispenser_serialnumber": serial,
+                "total_volume_dispensed": round(volume, 2),
+                "total_price_dispensed": round(price, 2),
+                "transactions_count": tx
+            })
+
+        # ----------------------------------------------------------------------
+        # FINAL RESPONSE
+        # ----------------------------------------------------------------------
         return Response({
             "total_transactions": total_transactions,
-            "total_volume_dispensed": round(total_volume_dispensed, 2),
-            "total_price_dispensed": round(total_price_dispensed, 2),
+            "total_volume_dispensed": total_volume_dispensed,
+            "total_price_dispensed": total_price_dispensed,
             "total_assets": total_assets,
 
             "fuel_amount_consumption": {
-                "daywise": fuel_amount_consumption,
+                "daywise": fuel_amount_daywise,
                 "grand_total_volume": round(grand_total_volume, 2),
                 "grand_total_price": round(grand_total_price, 2)
+            },
+
+            "asset_vin_count": {
+                "daywise": asset_vin_daywise,
+                "grand_asset_request_count": grand_asset_request_count,
+                "grand_vin_request_count": grand_vin_request_count,
+                "grand_total_requests": grand_total_requests
+            },
+
+            "dispenser_unit_wise_consumption": {
+                "units": dispenser_unit_wise,
+                "grand_total_volume": round(grand_dispenser_total_volume, 2),
+                "grand_total_price": round(grand_dispenser_total_price, 2),
+                "grand_total_transactions": grand_dispenser_total_transactions
             }
 
         }, status=200)

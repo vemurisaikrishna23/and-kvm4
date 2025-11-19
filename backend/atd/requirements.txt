@@ -28,9 +28,7 @@ idna==3.10
 incremental==24.7.2
 Markdown==3.9
 msgpack==1.1.2
-mysql==0.0.3
 mysql-connector-python==9.4.0
-mysqlclient==2.2.7
 packaging==25.0
 passlib==1.7.4
 pyasn1==0.6.1
