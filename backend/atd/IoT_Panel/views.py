@@ -2451,4 +2451,154 @@ class DeleteVINVehicle(APIView):
 
         
 
+class AddDispenserGunMappingToVehicles(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            serializer = CreateDispenserGunMappingToVehiclesSerializer(data=request.data, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Dispenser & Gun Unit Mapping to Vehicles Created Successfully",
+                    }, status=status.HTTP_201_CREATED)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to add a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Dispenser Gun Mapping to Customer
+class GetDispenserGunMappingToVehicles(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.all()
+            serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+
+
+#Get Dispenser Gun Mapping to Vehicles by Vehicle ID
+class GetDispenserGunMappingToVehiclesByVehicleID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, vehicle_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if any(role in roles for role in ['IOT Admin']):
+            dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+                    vehicle=vehicle_id,
+                    assigned_status=True
+                )
+            
+            serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "You are not authorized to get dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+#Edit Dispenser Gun Mapping to Vehicles
+class EditDispenserGunMappingToVehicles(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            try:
+                instance = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
+            except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
+                return Response({'error': 'Dispenser Gun Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = EditDispenserGunMappingToVehiclesSerializer(instance, data=request.data, partial=True, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()
+                    return Response({
+                        "message": "Dispenser Gun Mapping to Vehicles Updated Successfully",
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit a dispenser gun mapping to vehicle"}, status=status.HTTP_403_FORBIDDEN)
+
+class EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        
+        if "IOT Admin" in roles:
+            try:
+                instance = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
+            except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
+                return Response({'error': 'Dispenser Gun Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = EditStatusAndAssignedStatusOfDispenserGunMappingToVehiclesSerializer(instance, data=request.data, partial=True, context={"user": user})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.save()                    
+                    if 'status' in request.data:
+                        return Response({
+                            "message": "Status field updated successfully",
+                        }, status=status.HTTP_200_OK)
+                    elif 'assigned_status' in request.data:
+                        return Response({
+                            "message": "Assigned status updated successfully",
+                        }, status=status.HTTP_200_OK)
+                    else:
+                        return Response({
+                            "message": "Dispenser Gun Mapping updated successfully",
+                        }, status=status.HTTP_200_OK)
+                        
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to edit the status of a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+
+#Delete Dispenser Gun Mapping to Vehicles
+class DeleteDispenserGunMappingToVehicles(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        if "IOT Admin" in roles:
+            try:
+                instance = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
+            except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
+                return Response({'error': 'Dispenser Gun Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = DeleteDispenserGunMappingToVehiclesSerializer(data={'id': id}, context={'instance': instance})
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    serializer.delete(instance)
+                    return Response({'message': 'Dispenser Gun Mapping to Vehicles Deleted Successfully'}, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "You are not authorized to delete a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)

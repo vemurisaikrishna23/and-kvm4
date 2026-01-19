@@ -81,9 +81,19 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
         (3, 'Allocated'),
         (4, 'Error'),
     ]
+
+    Installation_Mode = [
+        (0, 'Static'),
+        (1, 'Mobility')
+    ]
+
+    Fuel_Level_Sensor_Type = [
+        (0, 'None'),
+        (1, 'Capacitive')
+    ]
     id = models.BigAutoField(primary_key=True)
     dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE)
-    gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE)
+    gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE,blank=True, null=True)
     customer = models.BigIntegerField(help_text="Customer ID")
     totalizer_reading = models.FloatField(default=0.00, validators=[MaxValueValidator(99999999.0)],help_text="Totalizer reading value at the time of assigning the dispenser-gun pair to the customer")
     live_totalizer_reading = models.FloatField(default=0.00, validators=[MaxValueValidator(99999999.0)], help_text="Live totalizer reading value")
@@ -97,6 +107,11 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
     status = models.BooleanField(default=True, help_text="to stop controls to the customer")
     machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
     connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
+    installation_mode = models.IntegerField(default=0, choices=Installation_Mode, help_text="Installation Mode")
+    fuel_level_sensor = models.BooleanField(default=False, help_text="Whether the tank is installed with fuel level sensor or not")
+    fuel_level_sensor_type = models.IntegerField(default=0, choices=Fuel_Level_Sensor_Type, help_text="Fuel Level Sensor Type")
+    fuel_level_sensor_brand = models.CharField(max_length=100,blank=True,null=True,db_comment="Brand of the Fuel Level Sensor")
+    tank_capacity = models.FloatField(blank=True,null=True, help_text="Tank Capacity")
     remarks = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
@@ -263,3 +278,61 @@ class VIN_Vehicle(models.Model):
         db_table = "vin_vehicle"
         verbose_name = "VIN Vehicle"
         verbose_name_plural = "VIN Vehicles"
+
+
+class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
+    Machine_Status = [
+        (1, 'Idle'),
+        (0, 'Offline'),
+        (2, 'Dispensing'),
+        (3, 'Allocated'),
+        (4, 'Error'),
+    ]
+    Installation_Mode = [
+        (0, 'Static'),
+        (1, 'Mobility')
+    ]
+
+    Fuel_Level_Sensor_Type = [
+        (0, 'None'),
+        (1, 'Capacitive')
+    ]
+
+    Dispenser_Position = [
+        (0, 'Left'),
+        (1, 'Right'),
+        (2, 'Center'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE)
+    gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE,blank=True, null=True)
+    vehicle = models.BigIntegerField(help_text="Vehicle ID",blank=True, null=True)
+    totalizer_reading = models.FloatField(default=0.00, validators=[MaxValueValidator(99999999.0)],help_text="Totalizer reading value at the time of assigning the dispenser-gun pair to the customer")
+    live_totalizer_reading = models.FloatField(default=0.00, validators=[MaxValueValidator(99999999.0)], help_text="Live totalizer reading value")
+    total_reading_amount = models.FloatField(default=0.00, help_text="Total amount collected at the time of assigning the dispenser-gun pair to the customer") 
+    live_total_reading_amount = models.FloatField(default=0.00, help_text="Live total amount collected so far")
+    live_price = models.FloatField(default=0.00, help_text="Current price per liter/unit")
+    grade = models.IntegerField(blank=True, null=True, help_text="Fuel grade/type")
+    nozzle = models.IntegerField(blank=True, null=True, help_text="Nozzle number")
+    dispenser_position = models.IntegerField(default=0, choices=Dispenser_Position, help_text="Dispenser Position")
+    gps_coordinates = models.JSONField(blank=True, null=True, help_text="Live GPS coordinates as JSON: {'lat': ..., 'lon': ...}")
+    assigned_status = models.BooleanField(default=True, help_text="Whether this unit is currently with vehicles or not")
+    status = models.BooleanField(default=True, help_text="to stop controls to the vehicles")
+    machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
+    connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
+    installation_mode = models.IntegerField(default=0, choices=Installation_Mode, help_text="Installation Mode")
+    fuel_level_sensor = models.BooleanField(default=False, help_text="Whether the tank is installed with fuel level sensor or not")
+    fuel_level_sensor_type = models.IntegerField(default=0, choices=Fuel_Level_Sensor_Type, help_text="Fuel Level Sensor Type")
+    fuel_level_sensor_brand = models.CharField(max_length=100,blank=True,null=True,db_comment="Brand of the Fuel Level Sensor")
+    tank_capacity = models.FloatField(blank=True,null=True, help_text="Tank Capacity")
+    remarks = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    updated_by = models.PositiveBigIntegerField(blank=True, null=True)
+ 
+    class Meta:
+        db_table = "dispenser_gun_mapping_to_vehicles"
+        verbose_name = "Dispenser-Gun Mapping to Vehicles"
+        verbose_name_plural = "Dispenser-Gun Mappings to Vehicles"
