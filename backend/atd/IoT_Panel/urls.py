@@ -33,6 +33,15 @@ urlpatterns = [
     path("dispenser-gun-mapping-to-customer/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-customer"),
     path("dispenser-gun-mapping-to-customer/delete/<int:id>/", DeleteDispenserGunMappingToCustomer.as_view(), name="delete-dispenser-gun-mapping-to-customer"),
 
+
+    path("dispenser-gun-mapping-to-vehicle/add/", AddDispenserGunMappingToVehicles.as_view(), name="add-dispenser-gun-mapping-to-vehicles"),
+    path("dispenser-gun-mapping-to-vehicle/get/", GetDispenserGunMappingToVehicles.as_view(), name="get-dispenser-gun-mapping-to-vehicles"),
+    path("dispenser-gun-mapping-to-vehicle/get/<int:vehicle_id>/", GetDispenserGunMappingToVehiclesByVehicleID.as_view(), name="get-dispenser-gun-mapping-to-customer-by-vehicle-id"),
+    path("dispenser-gun-mapping-to-vehicle/edit/<int:id>/", EditDispenserGunMappingToVehicles.as_view(), name="edit-dispenser-gun-mapping-to-vehicles"),
+    path("dispenser-gun-mapping-to-vehicle/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-vehicles"),
+    path("dispenser-gun-mapping-to-vehicle/delete/<int:id>/", DeleteDispenserGunMappingToVehicles.as_view(), name="delete-dispenser-gun-mapping-to-vehicles"),
+
+
     path("node-dispenser-customer-mapping/add/", AssignNodeUnitAndDispenserGunMappingToCustomer.as_view(), name="assign-node-unit-and-dispenser-gun-mapping-to-customer"),
     path("node-dispenser-customer-mapping/get/", GetNodeDispenserCustomerMapping.as_view(), name="get-node-dispenser-customer-mapping"),
     path("node-dispenser-customer-mapping/get/<int:customer_id>/", GetNodeDispenserCustomerMappingByCustomerID.as_view(), name="get-node-dispenser-customer-mapping-by-customer-id"),
@@ -69,13 +78,6 @@ urlpatterns = [
     path("dashboard/reconsiliance/<int:customer_id>/", DailyReconciliationDashBoardView.as_view(), name="reconsiliance page"),
     path("dashboard/overview/<int:customer_id>/", OverviewDashboard.as_view(), name="overview page"),
 
-
-    path("dispenser-gun-mapping-to-vehicle/add/", AddDispenserGunMappingToVehicles.as_view(), name="add-dispenser-gun-mapping-to-vehicles"),
-    path("dispenser-gun-mapping-to-vehicle/get/", GetDispenserGunMappingToVehicles.as_view(), name="get-dispenser-gun-mapping-to-vehicles"),
-    path("dispenser-gun-mapping-to-vehicle/get/<int:vehicle_id>/", GetDispenserGunMappingToVehiclesByVehicleID.as_view(), name="get-dispenser-gun-mapping-to-customer-by-vehicle-id"),
-    path("dispenser-gun-mapping-to-vehicle/edit/<int:id>/", EditDispenserGunMappingToVehicles.as_view(), name="edit-dispenser-gun-mapping-to-vehicles"),
-    path("dispenser-gun-mapping-to-vehicle/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-vehicles"),
-    path("dispenser-gun-mapping-to-vehicle/delete/<int:id>/", DeleteDispenserGunMappingToVehicles.as_view(), name="delete-dispenser-gun-mapping-to-vehicles"),
 
 ]
 
