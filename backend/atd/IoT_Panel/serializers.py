@@ -2466,11 +2466,6 @@ class DeleteVINVehicleSerializer(serializers.ModelSerializer):
 
 
 
-
-
-
-
-
 class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     vehicle = serializers.IntegerField(required=True)
     dispenser_unit = serializers.PrimaryKeyRelatedField(
@@ -2557,6 +2552,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             gun_unit=gun_unit,  # NULL allowed
             totalizer_reading=validated_data['totalizer_reading'],
             total_reading_amount=validated_data['total_reading_amount'],
+            installation_mode=1,
             live_price=validated_data['live_price'],
             grade=validated_data['grade'],
             nozzle=validated_data['nozzle'],
