@@ -3,36 +3,33 @@ name: Build & Deploy Backend
 on:
   push:
     branches:
-      - main
+      - main   # change if you deploy from another branch
 
 jobs:
-  build-push-deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
-    steps:
-      # 1️⃣ Checkout code
-      - name: Checkout code
-        uses: actions/checkout@v3
+    defaults:
+      run:
+        working-directory: backend/atd
 
-      # 2️⃣ Login to Docker Hub
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 3️⃣ Build & Push Docker Image (NO CACHE + SHA TAG)
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: ./backend/atd
           push: true
-          no-cache: true
-          tags: |
-            myaccess2021/atd-backend:latest
-            myaccess2021/atd-backend:${{ github.sha }}
+          tags: myaccess2021/atd-backend:latest
 
-      # 4️⃣ Deploy to Dedicated Server
       - name: Deploy to Dedicated Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -40,14 +37,11 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            docker pull myaccess2021/atd-backend:${{ github.sha }}
-
+            docker pull myaccess2021/atd-backend:latest
             docker stop atd-backend || true
             docker rm atd-backend || true
-
             docker run -d \
               --name atd-backend \
+              --restart unless-stopped \
               -p 8003:8000 \
-              myaccess2021/atd-backend:${{ github.sha }}
-
-            docker image prune -f
+              myaccess2021/atd-backend:latest
