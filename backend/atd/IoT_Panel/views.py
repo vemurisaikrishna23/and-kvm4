@@ -2527,7 +2527,7 @@ class EditDispenserGunMappingToVehicles(APIView):
             try:
                 instance = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
             except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
-                return Response({'error': 'Dispenser Gun Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Dispenser Gun Mapping To Vehicles with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
             
             serializer = EditDispenserGunMappingToVehiclesSerializer(instance, data=request.data, partial=True, context={"user": user})
             if serializer.is_valid(raise_exception=True):

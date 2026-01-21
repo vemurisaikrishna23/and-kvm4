@@ -804,10 +804,11 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomerSerializer(seria
             
             # Update gun unit assigned_status
             gun_unit = instance.gun_unit
-            gun_unit.assigned_status = new_assigned_status
-            gun_unit.updated_by = (user.id if user else gun_unit.updated_by)
-            gun_unit.updated_at = timezone.now()
-            gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+            if gun_unit:
+                gun_unit.assigned_status = new_assigned_status
+                gun_unit.updated_by = (user.id if user else gun_unit.updated_by)
+                gun_unit.updated_at = timezone.now()
+                gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
             
             # Update the mapping instance
             instance.updated_by = (user.id if user else instance.updated_by)
@@ -2792,11 +2793,12 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToVehiclesSerializer(seria
             
             # Update gun unit assigned_status
             gun_unit = instance.gun_unit
-            gun_unit.assigned_status = new_assigned_status
-            gun_unit.updated_by = (user.id if user else gun_unit.updated_by)
-            gun_unit.updated_at = timezone.now()
-            gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
-            
+            if gun_unit:
+                gun_unit.assigned_status = new_assigned_status
+                gun_unit.updated_by = (user.id if user else gun_unit.updated_by)
+                gun_unit.updated_at = timezone.now()
+                gun_unit.save(update_fields=['assigned_status', 'updated_by', 'updated_at'])
+                
             # Update the mapping instance
             instance.updated_by = (user.id if user else instance.updated_by)
             instance.updated_at = timezone.now()
