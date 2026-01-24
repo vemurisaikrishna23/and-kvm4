@@ -336,3 +336,85 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
         db_table = "dispenser_gun_mapping_to_vehicles"
         verbose_name = "Dispenser-Gun Mapping to Vehicles"
         verbose_name_plural = "Dispenser-Gun Mappings to Vehicles"
+
+
+class OrderFuelDispensingDetails(models.Model):
+    # Request_Status = [
+    #     (0, 'Pending'),
+    #     (1, 'Completed'),
+    #     (2, 'Failed'),
+    # ]
+
+    Request_Status = [
+        (0, 'Pending'),
+        (1, 'Hardware Received'),
+        (2, 'Dispensiing'),
+        (3, 'Completed'),
+        (4,'Interrupted'),
+        (5,'Failed')
+    ]
+
+    Validation_Status = [
+        (0, 'True'),
+        (1, 'False'),
+        (2, 'Pending')
+    ]
+    Request_Type = [
+        (0, 'Volume'),
+        (1, 'Amount'),
+    ]
+
+    # Request_Vehicle = [
+    #     (0, 'Asset'),
+    #     (1, 'VIN'),
+    # ]
+    id = models.BigAutoField(primary_key=True)
+    driver_id = models.BigIntegerField(help_text="Driver ID of who is requesting the fuel dispensing")
+    driver_name = models.CharField(max_length=255,blank=True,null=True, help_text="Driver Name")
+    driver_email = models.EmailField(blank=True,null=True, help_text="Driver Email")
+    driver_phone = models.CharField(max_length=255,blank=True,null=True, help_text="Driver Phone")
+    vehicle_id = models.BigIntegerField(help_text="Vehicle ID")
+    route_plan_details_id = models.BigIntegerField(help_text="Route Plan Details ID")
+    route_plan_id = models.BigIntegerField(help_text="Route Plan ID")
+    order_id = models.BigIntegerField(help_text="Order ID")
+    dispenser_gun_mapping_id = models.BigIntegerField(help_text="Dispenser Gun Mapping ID assigned to the vehicle")
+    dispenser_serialnumber = models.CharField(max_length=255, help_text="Dispenser Unit Serial Number")
+    dispenser_imeinumber = models.CharField(max_length=255, help_text="Dispenser Unit IMEI Number")
+    delivery_location_id = models.BigIntegerField(blank=True,null=True, help_text="Delivery Location ID")
+    total_ordered_quantity = models.FloatField(blank=True,null=True, help_text="Total Ordered Quantity")
+    remaining_quantity_dispensed = models.FloatField(blank=True,null=True, help_text="Remaining Quantity that should be dispensed in this order")
+    asset_id = models.BigIntegerField(help_text="Asset ID" )
+    asset_name = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Name")
+    asset_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag ID")
+    asset_tag_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag Type")
+    asset_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Type")
+    transaction_id = models.CharField(max_length=255, help_text="Transaction ID")
+    dispenser_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Volume")
+    dispenser_price = models.FloatField(blank=True,null=True, help_text="Dispenser Price")
+    dispenser_live_price = models.FloatField(blank=True,null=True, help_text="Dispenser Live Price")
+    dispenser_received_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Received Volume")
+    dispenser_received_price = models.FloatField(blank=True,null=True, help_text="Dispenser Received Price")
+    totalizer_volume_starting = models.FloatField(blank=True,null=True, help_text="Totalizer Volume at transaction starting")
+    totalizer_volume_ending = models.FloatField(blank=True,null=True, help_text="Totalizer Volume at transaction ending")
+    totalizer_price_starting = models.FloatField(blank=True,null=True, help_text="Totalizer Price at transaction starting")
+    totalizer_price_ending = models.FloatField(blank=True,null=True, help_text="Totalizer Price at transaction ending")
+    gps_coordinates_starting = models.JSONField(blank=True, null=True, help_text="GPS coordinates at transaction starting as JSON: {'lat': ..., 'lon': ...}")
+    gps_coordinates_ending = models.JSONField(blank=True, null=True, help_text="GPS coordinates at transaction ending as JSON: {'lat': ..., 'lon': ...}")
+    totalizer_validation = models.IntegerField(default=2, choices=Validation_Status, help_text="Totalizer Reading Validation with previous transaction")
+    request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
+    request_status = models.IntegerField(default=0, choices=Request_Status, help_text="Request Status")
+    fuel_state = models.BooleanField(default=False)
+    transaction_log = models.JSONField(blank=True, null=True, help_text="log of the transaction")
+    dispense_end_time = models.DateTimeField(blank=True, null=True, help_text="Fuel Dispense End Time")
+    dispense_time_taken = models.FloatField(blank=True, null=True, help_text="Fuel Dispense Time Taken in seconds")
+    dispense_status_code = models.IntegerField(default=0,help_text="Fuel Dispenser Status Code")
+    remarks = models.CharField(max_length=255, blank=True, null=True, help_text="Remarks")
+    request_created_at = models.DateTimeField(blank=True, null=True)
+    request_updated_at = models.DateTimeField(blank=True, null=True)
+    request_created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    request_updated_by = models.PositiveBigIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "order_fuel_dispensing_details"
+        verbose_name = "Order Fuel Dispensing Details"
+        verbose_name_plural = "Order Fuel Dispensing Details"

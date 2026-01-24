@@ -40,7 +40,7 @@ urlpatterns = [
     path("dispenser-gun-mapping-to-vehicle/edit/<int:id>/", EditDispenserGunMappingToVehicles.as_view(), name="edit-dispenser-gun-mapping-to-vehicles"),
     path("dispenser-gun-mapping-to-vehicle/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-vehicles"),
     path("dispenser-gun-mapping-to-vehicle/delete/<int:id>/", DeleteDispenserGunMappingToVehicles.as_view(), name="delete-dispenser-gun-mapping-to-vehicles"),
-
+    path("dispenser-gun-mapping-to-vehicle/get-by-vehicle-no/", GetDispenserGunMappingByVehicleNo.as_view(), name="get-dispenser-gun-mapping-to-vehicles-by-vehicle-no"),
 
     path("node-dispenser-customer-mapping/add/", AssignNodeUnitAndDispenserGunMappingToCustomer.as_view(), name="assign-node-unit-and-dispenser-gun-mapping-to-customer"),
     path("node-dispenser-customer-mapping/get/", GetNodeDispenserCustomerMapping.as_view(), name="get-node-dispenser-customer-mapping"),
@@ -79,6 +79,7 @@ urlpatterns = [
     path("dashboard/overview/<int:customer_id>/", OverviewDashboard.as_view(), name="overview page"),
 
 
+    path("order-request-fuel-dispensing/create/", CreateOrderRequestForFuelDispensing.as_view(), name="create-request-for-order-fuel-dispensing"),
 ]
 
 

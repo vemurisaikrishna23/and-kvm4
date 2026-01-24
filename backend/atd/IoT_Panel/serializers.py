@@ -2590,6 +2590,9 @@ class GetDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
         depth = 1
 
 
+class VehicleNoSerializer(serializers.Serializer):
+    vehicle_no = serializers.CharField(required=True)
+
 
 
 
@@ -2823,3 +2826,168 @@ class DeleteDispenserGunMappingToVehiclesSerializer(serializers.Serializer):
     def delete(self, instance):
         instance.delete()
         return instance
+
+
+class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    route_plan_details_id = serializers.IntegerField()
+    dispenser_gun_mapping_id = serializers.IntegerField()
+    asset_id = serializers.CharField(required=False)  # ✅ VIN strings supported
+    asset_name = serializers.CharField(required=False)
+    request_type = serializers.ChoiceField(choices=[0, 1])  # 0: Volume, 1: Amount
+    dispenser_volume = serializers.FloatField(required=False)
+    dispenser_price = serializers.FloatField(required=False)
+    remarks = serializers.CharField(required=False, allow_blank=True)
+
+
+    def validate(self, data):
+        user = self.context.get("user")
+        login_user_id = getattr(user, "id", None)
+        user_id = data.get("user_id")
+
+        route_plan_details_id = data.get("route_plan_details_id")
+        dispenser_gun_mapping_id = data.get("dispenser_gun_mapping_id")
+        asset_id = data.get("asset_id")
+        asset_name = data.get("asset_name")
+        request_type = data.get("request_type")
+        dispenser_volume = data.get("dispenser_volume")
+        dispenser_price = data.get("dispenser_price")
+
+        # ---------- 1️⃣ Validate User ----------
+        try:
+            user_obj = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            raise serializers.ValidationError("Invalid user_id")
+
+        if login_user_id != user_id:
+            raise serializers.ValidationError("Logged-in user does not match given user_id")
+
+        data["driver_name"] = user_obj.name
+        data["driver_email"] = user_obj.email
+        data["driver_phone"] = user_obj.mobile
+
+            # Validate route_plan_details from input
+        try:
+            route_plan_details = RoutePlanDetails.objects.get(id=route_plan_details_id)
+        except RoutePlanDetails.DoesNotExist:
+            raise serializers.ValidationError("Invalid route_plan_details_id")
+
+        route_plan_id = route_plan_details.route_plan
+        data["route_plan_id"] = route_plan_id
+        order_id = route_plan_details.subject_id
+        data["order_id"] = order_id
+
+                # ---------- Prevent parallel transactions for same order ----------
+        existing_request = OrderFuelDispensingDetails.objects.filter(
+            order_id=order_id,
+            request_status__in=[0, 1, 2]  # Pending, Hardware Received, Dispensing
+        ).first()
+
+        if existing_request:
+            raise serializers.ValidationError(
+                "A fuel dispensing transaction is already in progress for this order."
+            )
+        vehicle_id = route_plan_id.vehicle_id
+        data["vehicle_id"] = vehicle_id
+
+        dispeser_unit_id = Dispenser_Gun_Mapping_To_Vehicles.dispenser_unit
+        try:
+            dispenser_unit = DispenserUnits.objects.get(id=dispeser_unit_id)
+        except DispenserUnits.DoesNotExist:
+            raise serializers.ValidationError("Dispenser unit not found")
+
+        data["dispenser_serialnumber"] = dispenser_unit.serial_number
+        data["dispenser_imeinumber"] = dispenser_unit.imei_number
+
+        try:
+            delivery_location_id = Orders.objects.get(id=order_id).delivery_location_id
+        except:
+            raise serializers.ValidationError("Delivery Location not found")
+        data["delivery_location_id"] = delivery_location_id
+        
+        total_ordered_quantity = Orders.objects.get(id=order_id).total_quantity
+        data["total_ordered_quantity"] = total_ordered_quantity
+
+
+            # Asset validation
+        if asset_id:
+            try:
+                asset = Assets.objects.get(id=int(asset_id))
+            except (Assets.DoesNotExist, ValueError):
+                raise serializers.ValidationError("Invalid asset_id")
+
+            data["asset_id"] = asset.id
+            data["asset_name"] = asset.name
+            data["asset_tag_id"] = asset.tag_id
+            data["asset_tag_type"] = asset.tag_type
+            data["asset_type"] = asset.type
+
+        else:
+            if not asset_name:
+                raise serializers.ValidationError(
+            "asset_name is required when asset_id is not provided"
+        )
+
+            data["asset_id"] = None
+            data["asset_name"] = asset_name
+            data["asset_tag_id"] = None
+            data["asset_tag_type"] = None
+            data["asset_type"] = None
+            
+
+            # Generate new transaction ID
+        while True:
+            txn_id = "TXN" + str(random.randint(100000000000, 999999999999))
+            if not RequestFuelDispensingDetails.objects.filter(transaction_id=txn_id).exists():
+                break
+        data["transaction_id"] = txn_id
+
+            # Volume or Amount
+        if request_type == 0:
+            if dispenser_volume is None:
+                raise serializers.ValidationError("dispenser_volume is required for Volume type requests.")
+            data["dispenser_volume"] = dispenser_volume
+            data["dispenser_price"] = 0.0
+        else:
+            if dispenser_price is None:
+                raise serializers.ValidationError("dispenser_price is required for Amount type requests.")
+            data["dispenser_price"] = dispenser_price
+            data["dispenser_volume"] = 0.0
+
+        return data
+
+    def create(self, validated_data):
+        remarks = validated_data.get("remarks", "")
+
+        RequestFuelDispensingDetails.objects.create(
+            driver_id=validated_data["user_id"],
+            driver_name=validated_data["driver_name"],
+            driver_email=validated_data["driver_email"],
+            driver_phone=validated_data["driver_phone"],
+            vehicle_id=validated_data["vehicle_id"],
+            route_plan_details_id=validated_data["route_plan_details_id"],
+            route_plan_id=validated_data["route_plan_id"],
+            order_id=validated_data["order_id"],
+            total_ordered_quantity=validated_data["total_ordered_quantity"],
+            dispenser_gun_mapping_id=validated_data["dispenser_gun_mapping_id"],
+            dispenser_serialnumber=validated_data["dispenser_serialnumber"],
+            dispenser_imeinumber=validated_data["dispenser_imeinumber"],
+            delivery_location_id=validated_data["delivery_location_id"],
+            asset_id=validated_data.get("asset_id", None),
+            asset_name=validated_data["asset_name"],
+            asset_tag_id=validated_data.get("asset_tag_id", ""),
+            asset_tag_type=validated_data.get("asset_tag_type", ""),
+            asset_type=validated_data.get("asset_type", ""),
+            transaction_id=validated_data["transaction_id"],
+            dispenser_volume=validated_data["dispenser_volume"],
+            dispenser_price=validated_data["dispenser_price"],
+            dispenser_live_price=0.0,
+            request_type=validated_data["request_type"],
+            request_status=0,
+            fuel_state=False,
+            transaction_log={},
+            remarks=remarks,
+            request_created_at=timezone.now(),
+            request_created_by=validated_data["user_id"],
+        )
+        return validated_data

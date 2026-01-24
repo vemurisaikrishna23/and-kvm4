@@ -2512,6 +2512,53 @@ class GetDispenserGunMappingToVehiclesByVehicleID(APIView):
             return Response({"error": "You are not authorized to get dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
 
 
+class GetDispenserGunMappingByVehicleNo(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        serializer = VehicleNoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        vehicle_no = serializer.validated_data["vehicle_no"]
+
+        # Step 1: Get vehicle
+        vehicle = Vehicles.objects.filter(
+            vehicle_no=vehicle_no,
+            deleted_at__isnull=True
+        ).first()
+
+        if not vehicle:
+            return Response(
+                {"error": "Vehicle not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Step 2: Get dispenser-gun mappings
+        mappings = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+            vehicle=vehicle.id,
+            assigned_status=True
+        )
+
+        # Step 3: Serialize response
+        response_serializer = GetDispenserGunMappingToVehiclesSerializer(
+            mappings, many=True
+        )
+
+        return Response(
+            {
+                "vehicle_id": vehicle.id,
+                "vehicle_no": vehicle.vehicle_no,
+                "mappings": response_serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+
 
 #Edit Dispenser Gun Mapping to Vehicles
 class EditDispenserGunMappingToVehicles(APIView):
@@ -2602,3 +2649,34 @@ class DeleteDispenserGunMappingToVehicles(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to delete a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+
+class CreateOrderRequestForFuelDispensing(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+        print(user_id)
+
+        try:
+            serializer = CreateRequestForOrderFuelDispensingSerializer(
+                data=request.data,
+                context={"roles": roles, "user": user}
+            )
+            if serializer.is_valid(raise_exception=True):
+                try:
+                    response_data = serializer.save()
+                    return Response({
+                        "message": "Fuel dispensing order request created successfully.",
+                        "data": {"transaction_id": response_data.get("transaction_id")}
+                    }, status=status.HTTP_200_OK)
+                except serializers.ValidationError as e:
+                    print("error", e)
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
