@@ -2067,7 +2067,7 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
 
 #         return validated_data
 
-
+ 
 class GetFuelDispensingRequestsSerializer(serializers.ModelSerializer):
     DU_Accessible_delivery_locations_details = serializers.SerializerMethodField()
     class Meta:
@@ -2852,6 +2852,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
         request_type = data.get("request_type")
         dispenser_volume = data.get("dispenser_volume")
         dispenser_price = data.get("dispenser_price")
+        buffer_reason = data.get("buffer_reason")
 
         # ---------- 1️⃣ Validate User ----------
         try:
@@ -2872,7 +2873,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
         except RoutePlanDetails.DoesNotExist:
             raise serializers.ValidationError("Invalid route_plan_details_id")
 
-        route_plan_id = route_plan_details.route_plan
+        route_plan_id = route_plan_details.route_plan.id
         data["route_plan_id"] = route_plan_id
         order_id = route_plan_details.subject_id
         data["order_id"] = order_id
@@ -2904,17 +2905,34 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "A fuel dispensing transaction is already in progress for this order."
             )
-        vehicle_id = route_plan_id.vehicle_id
-        data["vehicle_id"] = vehicle_id
-
-        dispeser_unit_id = Dispenser_Gun_Mapping_To_Vehicles.dispenser_unit
         try:
-            dispenser_unit = DispenserUnits.objects.get(id=dispeser_unit_id)
-        except DispenserUnits.DoesNotExist:
-            raise serializers.ValidationError("Dispenser unit not found")
+            route_plan = RoutePlans.objects.get(id=route_plan_id)
+        except RoutePlans.DoesNotExist:
+            raise serializers.ValidationError("Invalid route_plan_id")
+        vehicle_id = route_plan.vehicle_id
+        data["vehicle_id"] = vehicle_id
+        print("ssssssssssssssssssssssssssssssssss")
 
+        # ---------- Validate Dispenser Gun Mapping ----------
+        try:
+            mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.get(
+                id=dispenser_gun_mapping_id
+            )
+        except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
+            raise serializers.ValidationError("Invalid dispenser_gun_mapping_id")
+
+        dispenser_unit = mapping.dispenser_unit
+
+        if not dispenser_unit:
+            raise serializers.ValidationError("Dispenser unit not linked to this mapping")
+
+        # ✅ Use the object directly
         data["dispenser_serialnumber"] = dispenser_unit.serial_number
         data["dispenser_imeinumber"] = dispenser_unit.imei_number
+
+        # ✅ Ensure mapping ID is an integer
+        data["dispenser_gun_mapping_id"] = mapping.id
+
 
         try:
             delivery_location_id = Orders.objects.get(id=order_id).delivery_location_id
@@ -2963,6 +2981,31 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
         if request_type == 0:
             if dispenser_volume is None:
                 raise serializers.ValidationError("dispenser_volume is required for Volume type requests.")
+                # Get latest dispensing record for this order
+            latest_record = OrderFuelDispensingDetails.objects.filter(
+                order_id=order_id
+            ).order_by("-id").first()
+
+            # CASE 1: Previous dispensing exists
+            if latest_record:
+                remaining_qty = latest_record.remaining_quantity_dispensed
+
+                # If remaining quantity is tracked and exceeded
+                if remaining_qty is not None and dispenser_volume > remaining_qty:
+                    if not buffer_reason:
+                        raise serializers.ValidationError(
+                            "Requested volume exceeds remaining order quantity. "
+                            "buffer_reason is required for extra quantity."
+                        )
+
+            # CASE 2: First dispensing for this order
+            else:
+                if total_ordered_quantity is not None and dispenser_volume > total_ordered_quantity:
+                    if not buffer_reason:
+                        raise serializers.ValidationError(
+                            "Requested volume exceeds total ordered quantity. "
+                            "buffer_reason is required for extra quantity."
+                        )
             data["dispenser_volume"] = dispenser_volume
             data["dispenser_price"] = 0.0
         else:
@@ -2976,7 +3019,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
     def create(self, validated_data):
         remarks = validated_data.get("remarks", "")
 
-        RequestFuelDispensingDetails.objects.create(
+        OrderFuelDispensingDetails.objects.create(
             driver_id=validated_data["user_id"],
             driver_name=validated_data["driver_name"],
             driver_email=validated_data["driver_email"],
@@ -3008,6 +3051,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
             fuel_state=False,
             transaction_log={},
             remarks=remarks,
+            buffer_reason=validated_data.get("buffer_reason"),
             request_created_at=timezone.now(),
             request_created_by=validated_data["user_id"],
         )

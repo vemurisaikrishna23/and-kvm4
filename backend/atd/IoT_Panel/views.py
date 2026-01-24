@@ -2702,3 +2702,115 @@ class GetOrderFuelDispensingRequests(APIView):
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class GetOrderFuelDispensingRequestsByVehicleId(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, vehicle_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.filter(
+                vehicle_id=vehicle_id
+            ).order_by("-id")
+        if not queryset.exists():
+            return Response(
+                {"error": "Order Fuel Dispensing Details not found for this vehicle"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class GetOrderFuelDispensingRequestsByDriverId(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, driver_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.filter(
+                driver_id=driver_id
+            ).order_by("-id")
+        if not queryset.exists():
+            return Response(
+                {"error": "Order Fuel Dispensing Details not found for this driver"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class GetOrderFuelDispensingRequestsByCustomerId(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, customer_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.filter(
+                customer_id=customer_id
+            ).order_by("-id")
+        if not queryset.exists():
+            return Response(
+                {"error": "Order Fuel Dispensing Details not found for this customer"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class GetOrderFuelDispensingRequestsByRoutePlanId(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, route_plan_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.filter(
+                route_plan_id=route_plan_id
+            ).order_by("-id")
+        if not queryset.exists():
+            return Response(
+                {"error": "Order Fuel Dispensing Details not found for this route plan"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class GetOrderFuelDispensingRequestsByOrderId(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.filter(
+                order_id=order_id
+            ).order_by("-id")
+        if not queryset.exists():
+            return Response(
+                {"error": "Order Fuel Dispensing Details not found for this order"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
