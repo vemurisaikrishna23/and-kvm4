@@ -960,7 +960,7 @@ class DeleteDeliveryLocationMappingDispenserUnit(APIView):
 class CreateRequestForFuelDispensing(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
-
+ 
     def post(self, request, format=None):
         user = request.user
         user_id = getattr(user, "id", None)
@@ -2680,3 +2680,25 @@ class CreateOrderRequestForFuelDispensing(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class GetOrderFuelDispensingRequests(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        if "IOT Admin" not in roles:
+            return Response(
+                {"error": "You are not authorized"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        queryset = OrderFuelDispensingDetails.objects.all().order_by("-id")
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

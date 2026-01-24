@@ -80,6 +80,7 @@ urlpatterns = [
 
 
     path("order-request-fuel-dispensing/create/", CreateOrderRequestForFuelDispensing.as_view(), name="create-request-for-order-fuel-dispensing"),
+    path("order-request-fuel-dispensing/get/", GetOrderFuelDispensingRequests.as_view(), name="get-all-order-fuel-dispensing-requests"),
 ]
 
 

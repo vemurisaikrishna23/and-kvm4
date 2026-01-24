@@ -2877,6 +2877,23 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
         order_id = route_plan_details.subject_id
         data["order_id"] = order_id
 
+            # Validate orders
+        try:
+            order_details = Orders.objects.get(id=order_id)
+        except Orders.DoesNotExist:
+            raise serializers.ValidationError("Invalid order_id")
+        customer_id = order_details.customer_id
+        try:
+            customer = Customers.objects.get(id=customer_id)
+        except Customers.DoesNotExist:
+            raise serializers.ValidationError("Customer not found")
+        data["customer_id"] = customer_id
+        data["customer_name"] = customer.name
+        data["customer_email"] = customer.email
+        data["customer_phone"] = customer.mobile
+
+
+
                 # ---------- Prevent parallel transactions for same order ----------
         existing_request = OrderFuelDispensingDetails.objects.filter(
             order_id=order_id,
@@ -2964,6 +2981,10 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
             driver_name=validated_data["driver_name"],
             driver_email=validated_data["driver_email"],
             driver_phone=validated_data["driver_phone"],
+            customer_id=validated_data["customer_id"],
+            customer_name=validated_data["customer_name"],
+            customer_email=validated_data["customer_email"],
+            customer_phone=validated_data["customer_phone"],
             vehicle_id=validated_data["vehicle_id"],
             route_plan_details_id=validated_data["route_plan_details_id"],
             route_plan_id=validated_data["route_plan_id"],
@@ -2991,3 +3012,36 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
             request_created_by=validated_data["user_id"],
         )
         return validated_data
+
+
+class VehicleBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vehicles
+        fields = [
+            "id",
+            "vehicle_no"
+        ]
+
+
+
+class GetOrderFuelDispensingDetailsSerializer(serializers.ModelSerializer):
+    vehicle = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderFuelDispensingDetails
+        exclude = ["transaction_log"]
+
+    def get_vehicle(self, obj):
+        if not obj.vehicle_id:
+            return None
+
+        vehicle = Vehicles.objects.filter(
+            id=obj.vehicle_id,
+            deleted_at__isnull=True
+        ).first()
+
+        if not vehicle:
+            return None
+
+        return VehicleBasicSerializer(vehicle).data
+
