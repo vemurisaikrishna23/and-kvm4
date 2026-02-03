@@ -24,4 +24,5 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "atd.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# CMD ["uvicorn", "atd.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "atd.asgi:application"]
