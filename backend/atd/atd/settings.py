@@ -207,5 +207,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://atd.myaccessio.com",
     "https://atd.myaccessio.com",
     "http://anytimediesel.myaccessio.com",
-    "https://anytimediesel.myaccessio.com"
+    "https://anytimediesel.myaccessio.com",
+    "https://atd-kvm4.myaccess.cloud",
+    "http://atd-kvm4.myaccess.cloud"
 ]
