@@ -804,7 +804,7 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomerSerializer(seria
             
             # Update gun unit assigned_status
             gun_unit = instance.gun_unit
-            if gun_unit:
+            if gun_unit is not None:
                 gun_unit.assigned_status = new_assigned_status
                 gun_unit.updated_by = (user.id if user else gun_unit.updated_by)
                 gun_unit.updated_at = timezone.now()
@@ -2497,6 +2497,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             'live_price',
             'grade',
             'nozzle',
+            'installation_mode',
             'dispenser_position',
             'remarks',
         ]
@@ -2553,7 +2554,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             gun_unit=gun_unit,  # NULL allowed
             totalizer_reading=validated_data['totalizer_reading'],
             total_reading_amount=validated_data['total_reading_amount'],
-            installation_mode=1,
+            installation_mode=validated_data['installation_mode'],
             live_price=validated_data['live_price'],
             grade=validated_data['grade'],
             nozzle=validated_data['nozzle'],
@@ -2604,6 +2605,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     live_price = serializers.FloatField(required=False)
     grade = serializers.IntegerField(required=False)
     nozzle = serializers.IntegerField(required=False)
+    installation_mode = serializers.IntegerField(required=False)
     remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
@@ -2616,6 +2618,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'live_price',
             'grade',
             'dispenser_position',
+            'installation_mode',
             'nozzle',
             'remarks',
         ]
@@ -2634,6 +2637,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'live_price': instance.live_price,
             'grade': instance.grade,
             'nozzle': instance.nozzle,
+            'installation_mode': instance.installation_mode,
             'dispenser_position': instance.dispenser_position,
             'remarks': instance.remarks,
         }
@@ -2674,6 +2678,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'total_reading_amount': instance.total_reading_amount,
             'live_price': instance.live_price,
             'dispenser_position': instance.dispenser_position,
+            'installation_mode': instance.installation_mode,
             'grade': instance.grade,
             'nozzle': instance.nozzle,
             'remarks': instance.remarks,
@@ -2687,6 +2692,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
         instance.live_price = validated_data.get('live_price', previous_data['live_price'])
         instance.grade = validated_data.get('grade', previous_data['grade'])
         instance.nozzle = validated_data.get('nozzle', previous_data['nozzle'])
+        instance.installation_mode = validated_data.get('installation_mode', previous_data['installation_mode'])
         instance.remarks = validated_data.get('remarks', previous_data['remarks'])
         
         # Handle dispenser_unit change
