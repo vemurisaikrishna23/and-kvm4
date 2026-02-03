@@ -325,6 +325,8 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
     fuel_level_sensor = models.BooleanField(default=False, help_text="Whether the tank is installed with fuel level sensor or not")
     fuel_level_sensor_type = models.IntegerField(default=0, choices=Fuel_Level_Sensor_Type, help_text="Fuel Level Sensor Type")
     fuel_level_sensor_brand = models.CharField(max_length=100,blank=True,null=True,db_comment="Brand of the Fuel Level Sensor")
+    fuel_level_sensor_description = models.CharField(max_length=111255,blank=True,null=True,db_comment="Description of the Fuel Level Sensor")
+    fuel_level_sensor_configuration = models.JSONField(blank=True,null=True,db_comment="Configuration of the Fuel Level Sensor")
     tank_capacity = models.FloatField(blank=True,null=True, help_text="Tank Capacity")
     remarks = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(blank=True, null=True)
