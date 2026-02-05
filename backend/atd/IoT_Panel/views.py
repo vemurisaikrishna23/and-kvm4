@@ -2500,14 +2500,11 @@ class GetDispenserGunMappingToVehiclesByID(APIView):
     def get(self, request, id, format=None):
         user = request.user
         user_id = getattr(user, "id", None)
-        roles = get_user_roles(user_id)
-        if any(role in roles for role in ['IOT Admin']):
-            dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
+        dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
             
-            serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "You are not authorized to get dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+        serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 #Get Dispenser Gun Mapping to Vehicles by Vehicle ID
 class GetDispenserGunMappingToVehiclesByVehicleID(APIView):
@@ -2518,16 +2515,14 @@ class GetDispenserGunMappingToVehiclesByVehicleID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        if any(role in roles for role in ['IOT Admin']):
-            dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+        dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
                     vehicle=vehicle_id,
                     assigned_status=True
                 )
             
-            serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "You are not authorized to get dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
+        serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 
 class GetDispenserGunMappingByVehicleNo(APIView):
