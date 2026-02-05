@@ -2792,6 +2792,26 @@ class GetOrderFuelDispensingRequestsByRoutePlanId(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class GetOrderFuelDispensingRequestsByRoutePlanDetailsId(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, route_plan_details_id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.filter(
+                route_plan_details_id=route_plan_details_id
+            ).order_by("-id")
+        if not queryset.exists():
+            return Response(
+                {"error": "Order Fuel Dispensing Details not found for this route plan"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class GetOrderFuelDispensingRequestsByOrderId(APIView):
     renderer_classes = [IoT_PanelRenderer]
