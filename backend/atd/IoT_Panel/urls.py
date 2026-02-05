@@ -82,6 +82,7 @@ urlpatterns = [
 
     path("order-request-fuel-dispensing/create/", CreateOrderRequestForFuelDispensing.as_view(), name="create-request-for-order-fuel-dispensing"),
     path("order-request-fuel-dispensing/get/", GetOrderFuelDispensingRequests.as_view(), name="get-all-order-fuel-dispensing-requests"),
+    path("order-request-fuel-dispensing/get/id/<int:id>/", GetOrderFuelDispensingRequestsById.as_view(), name="get-order-fuel-dispensing-requests-by-id"),
     path("order-request-fuel-dispensing/get/vehicle_id/<int:vehicle_id>/", GetOrderFuelDispensingRequestsByVehicleId.as_view(), name="get-order-fuel-dispensing-requests-by-vehicle-id"),
     path("order-request-fuel-dispensing/get/driver_id/<int:driver_id>/", GetOrderFuelDispensingRequestsByDriverId.as_view(), name="get-order-fuel-dispensing-requests-by-driver-id"),
     path("order-request-fuel-dispensing/get/customer_id/<int:customer_id>/", GetOrderFuelDispensingRequestsByCustomerId.as_view(), name="get-order-fuel-dispensing-requests-by-customer-id"),

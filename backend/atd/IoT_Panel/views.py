@@ -2717,6 +2717,22 @@ class GetOrderFuelDispensingRequests(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class GetOrderFuelDispensingRequestsById(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id, format=None):
+        user = request.user
+        user_id = getattr(user, "id", None)
+        roles = get_user_roles(user_id)
+
+        queryset = OrderFuelDispensingDetails.objects.get(
+                id=id
+            )
+        serializer = GetOrderFuelDispensingDetailsSerializer(queryset)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 
 class GetOrderFuelDispensingRequestsByVehicleId(APIView):
     renderer_classes = [IoT_PanelRenderer]
