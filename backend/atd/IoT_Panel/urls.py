@@ -36,7 +36,7 @@ urlpatterns = [
 
     path("dispenser-gun-mapping-to-vehicle/add/", AddDispenserGunMappingToVehicles.as_view(), name="add-dispenser-gun-mapping-to-vehicles"),
     path("dispenser-gun-mapping-to-vehicle/get/", GetDispenserGunMappingToVehicles.as_view(), name="get-dispenser-gun-mapping-to-vehicles"),
-    path("dispenser-gun-mapping-to-vehicle/get/<int:id>/", GetDispenserGunMappingToVehiclesByID.as_view(), name="get-dispenser-gun-mapping-to-vehicles-by-id"),
+    path("dispenser-gun-mapping-to-vehicle/get-by-id/<int:id>/", GetDispenserGunMappingToVehiclesByID.as_view(), name="get-dispenser-gun-mapping-to-vehicles-by-id"),
     path("dispenser-gun-mapping-to-vehicle/get/<int:vehicle_id>/", GetDispenserGunMappingToVehiclesByVehicleID.as_view(), name="get-dispenser-gun-mapping-to-customer-by-vehicle-id"),
     path("dispenser-gun-mapping-to-vehicle/edit/<int:id>/", EditDispenserGunMappingToVehicles.as_view(), name="edit-dispenser-gun-mapping-to-vehicles"),
     path("dispenser-gun-mapping-to-vehicle/edit-status/<int:id>/", EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles.as_view(), name="edit-status-and-assigned-status-of-dispenser-gun-mapping-to-vehicles"),
