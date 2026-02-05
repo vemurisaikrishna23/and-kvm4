@@ -734,6 +734,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def update_request_status_from_status_code(self, transaction_id: str, imei: str, status_code: int):
+        if not transaction_id or not str(transaction_id).strip():
+            return {"error": "Transaction ID not found"}
         txn = None
 
         try:
@@ -749,7 +751,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
             except OrderFuelDispensingDetails.DoesNotExist:
                 print(f"[WARN] No Request or Order ID found for transaction {transaction_id}")
-                return
+                return {"error": "Transaction ID not found"}
 
             if txn.dispenser_imeinumber != imei:
                 print(f"[SKIP STATUS] IMEI mismatch for TXN={transaction_id}")
