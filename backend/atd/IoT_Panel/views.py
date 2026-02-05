@@ -2502,8 +2502,7 @@ class GetDispenserGunMappingToVehiclesByID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
         if any(role in roles for role in ['IOT Admin']):
-            dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
-                    id=id)
+            dispenser_gun_mapping_to_vehicles = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=id)
             
             serializer = GetDispenserGunMappingToVehiclesSerializer(dispenser_gun_mapping_to_vehicles)
             return Response(serializer.data, status=status.HTTP_200_OK)
