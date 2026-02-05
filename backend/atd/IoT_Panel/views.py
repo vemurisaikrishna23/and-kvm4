@@ -2729,7 +2729,7 @@ class GetOrderFuelDispensingRequestsById(APIView):
         queryset = OrderFuelDispensingDetails.objects.get(
                 id=id
             )
-        serializer = GetOrderFuelDispensingDetailsSerializer(queryset)
+        serializer = GetOrderFuelDispensingDetailswithTransactionLogSerializer(queryset)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

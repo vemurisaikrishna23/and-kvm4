@@ -3616,6 +3616,27 @@ class VehicleBasicSerializer(serializers.ModelSerializer):
             "vehicle_no"
         ]
 
+class GetOrderFuelDispensingDetailswithTransactionLogSerializer(serializers.ModelSerializer):
+    vehicle = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderFuelDispensingDetails
+        fields = "__all__"
+
+    def get_vehicle(self, obj):
+        if not obj.vehicle_id:
+            return None
+
+        vehicle = Vehicles.objects.filter(
+            id=obj.vehicle_id,
+            deleted_at__isnull=True
+        ).first()
+
+        if not vehicle:
+            return None
+
+        return VehicleBasicSerializer(vehicle).data
+
 
 
 class GetOrderFuelDispensingDetailsSerializer(serializers.ModelSerializer):
