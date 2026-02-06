@@ -3448,6 +3448,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
                 # ---------- Prevent parallel transactions for same order ----------
         existing_request = OrderFuelDispensingDetails.objects.filter(
             order_id=order_id,
+            route_plan_details_id=route_plan_details_id,
             request_status__in=[0, 1, 2]  # Pending, Hardware Received, Dispensing
         ).first()
 
