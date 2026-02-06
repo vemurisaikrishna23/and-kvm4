@@ -2749,7 +2749,7 @@ class GetOrderFuelDispensingRequestsByVehicleId(APIView):
         if not queryset.exists():
             return Response(
                 {"error": "Order Fuel Dispensing Details not found for this vehicle"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_200_OK
             )
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
@@ -2771,7 +2771,7 @@ class GetOrderFuelDispensingRequestsByDriverId(APIView):
         if not queryset.exists():
             return Response(
                 {"error": "Order Fuel Dispensing Details not found for this driver"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_200_OK
             )
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
@@ -2792,7 +2792,7 @@ class GetOrderFuelDispensingRequestsByCustomerId(APIView):
         if not queryset.exists():
             return Response(
                 {"error": "Order Fuel Dispensing Details not found for this customer"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_200_OK
             )
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
@@ -2814,7 +2814,7 @@ class GetOrderFuelDispensingRequestsByRoutePlanId(APIView):
         if not queryset.exists():
             return Response(
                 {"error": "Order Fuel Dispensing Details not found for this route plan"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_200_OK
             )
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
@@ -2836,7 +2836,7 @@ class GetOrderFuelDispensingRequestsByRoutePlanDetailsId(APIView):
         if not queryset.exists():
             return Response(
                 {"error": "Order Fuel Dispensing Details not found for this route plan"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_200_OK
             )
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
@@ -2857,7 +2857,7 @@ class GetOrderFuelDispensingRequestsByOrderId(APIView):
         if not queryset.exists():
             return Response(
                 {"error": "Order Fuel Dispensing Details not found for this order"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_200_OK
             )
 
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
