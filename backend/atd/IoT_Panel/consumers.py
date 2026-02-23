@@ -352,7 +352,6 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     # Forward to DB update
                     result = await self.update_transaction_log(data)
                     request_status_result = await self.update_request_status_from_status_code(transaction_id, imei, status)
-                    print(request_status_result,"data")
                     if "error" in request_status_result:
                         print(f"[ERROR] Request status update failed: {request_status_result['error']}")
                         await self.send_error_message(request_status_result["error"])
@@ -711,25 +710,25 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 print(f"[WARN] No Request or Order ID found for transaction {transaction_id}")
                 return {"error": "Transaction ID not found"}
 
-            if request.dispenser_imeinumber != imei:
-                return {"error": "IMEI mismatch with transaction record."}
+        if request.dispenser_imeinumber != imei:
+            return {"error": "IMEI mismatch with transaction record."}
 
             # Prepare log (exclude these fields)
-            log_data = {
-                k: v for k, v in data.items()
-                if k not in ["type", "machine", "transaction_id", "imei"]
+        log_data = {
+            k: v for k, v in data.items()
+            if k not in ["type", "machine", "transaction_id", "imei"]
             }
 
             # Append to or initialize log
-            if isinstance(request.transaction_log, list):
-                request.transaction_log.append(log_data)
-            elif request.transaction_log:
-                request.transaction_log = [request.transaction_log, log_data]
-            else:
-                request.transaction_log = [log_data]
+        if isinstance(request.transaction_log, list):
+            request.transaction_log.append(log_data)
+        elif request.transaction_log:
+            request.transaction_log = [request.transaction_log, log_data]
+        else:
+            request.transaction_log = [log_data]
 
-            request.save(update_fields=["transaction_log"])
-            return {"success": True}
+        request.save(update_fields=["transaction_log"])
+        return {"success": True}
 
             
 
@@ -749,38 +748,37 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         if txn is None:
             try:
                 txn = OrderFuelDispensingDetails.objects.get(transaction_id=transaction_id)
-
             except OrderFuelDispensingDetails.DoesNotExist:
                 print(f"[WARN] No Request or Order ID found for transaction {transaction_id}")
                 return {"error": "Transaction ID not found"}
 
-            if txn.dispenser_imeinumber != imei:
-                print(f"[SKIP STATUS] IMEI mismatch for TXN={transaction_id}")
-                return {"error": "Transaction ID not found"}
+        if txn.dispenser_imeinumber != imei:
+            print(f"[SKIP STATUS] IMEI mismatch for TXN={transaction_id}")
+            return {"error": "Transaction ID not found"}
 
             # Map status_code to request_status
 
-            if status_code == 200:
-                request_status = 1  # Hardware Received
-            elif status_code == 0:
-                request_status = 0  # Pending
-            elif status_code in [201,202, 206]:
-                request_status = 2  # Dispensing
-            elif status_code in [203,204]:
-                request_status = 3  # Completed
-            elif status_code == 205:
-                request_status = 4  # Interrupted
-            elif status_code in [400, 401,402, 410, 411, 420]:
-                request_status = 5  # Failed
+        if status_code == 200:
+            request_status = 1  # Hardware Received
+        elif status_code == 0:
+            request_status = 0  # Pending
+        elif status_code in [201,202, 206]:
+            request_status = 2  # Dispensing
+        elif status_code in [203,204]:
+            request_status = 3  # Completed
+        elif status_code == 205:
+            request_status = 4  # Interrupted
+        elif status_code in [400, 401,402, 410, 411, 420]:
+            request_status = 5  # Failed
 
-            else:
-                request_status = 5  #Failed
+        else:
+            request_status = 5  #Failed
 
-            txn.request_status = request_status
-            txn.dispense_status_code = status_code
-            txn.save(update_fields=["request_status", "dispense_status_code"])
-            print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status} from code={status_code}")
-            return {"success": True,"request_status": request_status}
+        txn.request_status = request_status
+        txn.dispense_status_code = status_code
+        txn.save(update_fields=["request_status", "dispense_status_code"])
+        print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status} from code={status_code}")
+        return {"success": True,"request_status": request_status}
 
             
 
