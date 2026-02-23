@@ -352,6 +352,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     # Forward to DB update
                     result = await self.update_transaction_log(data)
                     request_status_result = await self.update_request_status_from_status_code(transaction_id, imei, status)
+                    print(request_status_result,"data")
                     if "error" in request_status_result:
                         print(f"[ERROR] Request status update failed: {request_status_result['error']}")
                         await self.send_error_message(request_status_result["error"])
