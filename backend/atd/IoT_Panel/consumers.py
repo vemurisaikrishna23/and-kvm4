@@ -741,7 +741,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         try:
             txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
         except RequestFuelDispensingDetails.DoesNotExist:
-            pass
+            return {"error": "Request Fuel Dispensing ID not found with Transaction ID"}
 
 
         # 2️⃣ If not found, try Vehicle mapping
