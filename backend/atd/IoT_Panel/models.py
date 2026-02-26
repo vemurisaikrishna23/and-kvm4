@@ -194,12 +194,14 @@ class RequestFuelDispensingDetails(models.Model):
     Request_Vehicle = [
         (0, 'Asset'),
         (1, 'VIN'),
+        (2, 'User')
     ]
     id = models.BigAutoField(primary_key=True)
     user_id = models.BigIntegerField(help_text="User ID of who is requesting the fuel dispensing")
     user_name = models.CharField(max_length=255,blank=True,null=True, help_text="User Name")
     user_email = models.EmailField(blank=True,null=True, help_text="User Email")
     user_phone = models.CharField(max_length=255,blank=True,null=True, help_text="User Phone")
+    user_tag = models.CharField(max_length=255,blank=True,null=True, help_text="User Tag")
     dispenser_gun_mapping_id = models.BigIntegerField(help_text="Dispenser Gun Mapping ID")
     dispenser_serialnumber = models.CharField(max_length=255, help_text="Dispenser Unit Serial Number")
     dispenser_imeinumber = models.CharField(max_length=255, help_text="Dispenser Unit IMEI Number")
@@ -210,7 +212,7 @@ class RequestFuelDispensingDetails(models.Model):
     customer_name = models.CharField(max_length=255, help_text="Customer Name")
     customer_email = models.EmailField(blank=True,null=True, help_text="Customer Email")
     customer_phone = models.CharField(max_length=255,blank=True,null=True, help_text="Customer Phone")
-    asset_id = models.BigIntegerField(help_text="Asset ID / VIN ID")
+    asset_id = models.BigIntegerField(blank=True, null=True,help_text="Asset ID / VIN ID")
     asset_name = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Name /VIN Name")
     asset_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag ID")
     asset_tag_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag Type")

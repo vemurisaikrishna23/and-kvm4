@@ -1963,7 +1963,7 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
             except VIN_Vehicle.DoesNotExist:
                 raise serializers.ValidationError("No active VIN found with this number or VIN already used.")
 
-            # 🚦 Validate user access based on VIN's Point of Contacts
+            #  Validate user access based on VIN's Point of Contacts
             vin_poc_ids = vin_obj.point_of_contact_id or []
             if vin_poc_ids:  # If VIN is assigned to specific POCs
                 if user_id not in vin_poc_ids:
@@ -2076,9 +2076,8 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
                 raise serializers.ValidationError("VIN-based requests must be of type Volume (request_type=0).")
 
             data["dispenser_volume"] = dispenser_volume
-            data["dispenser_price"] = 0.0
-
-        # ---------- 3️⃣ For Asset Vehicle ----------
+            data["dispenser_price"] = 0.0            
+        # ---------- 3️⃣ For Asset & User Vehicle ----------
         else:
             # Validate delivery_location from input
             try:
