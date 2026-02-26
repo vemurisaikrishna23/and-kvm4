@@ -294,7 +294,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 elif msg_type == 11:
                     required_fields = [
                         "imei", "transaction_id", "preset_state", "preset_volume_req", "preset_amount_req",
-                        "rfid_valid", "vehicle_tag_id","user_valid", "live_preset_volume", "live_preset_price",
+                        "rfid_valid", "vehicle_tag_id", "live_preset_volume", "live_preset_price",
                         "fuel_state", "status"
                     ]
 
@@ -312,7 +312,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         preset_volume_req = float(data["preset_volume_req"])
                         preset_amount_req = float(data["preset_amount_req"])
                         rfid_valid = bool(data["rfid_valid"])
-                        user_valid = bool(data["user_valid"])
+                        # user_valid = bool(data["user_valid"])
                         vehicle_tag_id = str(data["vehicle_tag_id"])
                         live_preset_volume = float(data["live_preset_volume"])
                         live_preset_price = float(data["live_preset_price"])

@@ -201,7 +201,7 @@ class RequestFuelDispensingDetails(models.Model):
     user_name = models.CharField(max_length=255,blank=True,null=True, help_text="User Name")
     user_email = models.EmailField(blank=True,null=True, help_text="User Email")
     user_phone = models.CharField(max_length=255,blank=True,null=True, help_text="User Phone")
-    user_tag = models.CharField(max_length=255,blank=True,null=True, help_text="User Tag")
+    # user_tag = models.CharField(max_length=255,blank=True,null=True, help_text="User Phone")
     dispenser_gun_mapping_id = models.BigIntegerField(help_text="Dispenser Gun Mapping ID")
     dispenser_serialnumber = models.CharField(max_length=255, help_text="Dispenser Unit Serial Number")
     dispenser_imeinumber = models.CharField(max_length=255, help_text="Dispenser Unit IMEI Number")
