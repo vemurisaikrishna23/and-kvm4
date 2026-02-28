@@ -710,106 +710,106 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
         return {"success": True,"request_status": txn.request_status}
 
-@database_sync_to_async
-def update_fuel_readings(
-    self,
-    imei,
-    fuel_level: float,
-    fuel_temperature: float,
-    epoch_time: int,
-    msg_type: int,
-    transaction_id: str = None
-):
-    try:
-        dispenser = DispenserUnits.objects.get(imei_number=imei)
-    except DispenserUnits.DoesNotExist:
-        print(f"[ERROR] Dispenser with IMEI {imei} not found")
-        return
+    @database_sync_to_async
+    def update_fuel_readings(
+        self,
+        imei,
+        fuel_level: float,
+        fuel_temperature: float,
+        epoch_time: int,
+        msg_type: int,
+        transaction_id: str = None
+    ):
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+        except DispenserUnits.DoesNotExist:
+            print(f"[ERROR] Dispenser with IMEI {imei} not found")
+            return
 
-    dispenser_mapping = None
-    is_customer = False
+        dispenser_mapping = None
+        is_customer = False
 
-    # 1️⃣ Try Customer mapping first
-    dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
-        dispenser_unit=dispenser,
-        assigned_status=True
-    ).first()
-
-    if dispenser_mapping:
-        is_customer = True
-    else:
-        # 2️⃣ Try Vehicle mapping
-        dispenser_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+        # 1️⃣ Try Customer mapping first
+        dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
             dispenser_unit=dispenser,
             assigned_status=True
         ).first()
 
-    if not dispenser_mapping:
-        print(f"[WARN] No customer or vehicle mapping found for IMEI {imei}")
-        return
-
-    # ==========================================
-    # 🚀 CASE 1 → 41 (Transaction Data)
-    # ==========================================
-    if msg_type == 41:
-        FuelSensorReadings.objects.create(
-            dispenser_customer_mapping=dispenser_mapping if is_customer else None,
-            dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
-            fuel_level=fuel_level,
-            temperature=fuel_temperature,
-            data_type=41,
-            transaction_id=transaction_id,
-            epoch_time=epoch_time
-        )
-        print(f"[FUEL TXN INSERT] Transaction snapshot stored for IMEI {imei}")
-        return
-
-    # ==========================================
-    # 🚀 CASE 2 → 31 (30 sec Auto Push)
-    # ==========================================
-    if msg_type == 31:
-
-        # Fetch latest reading
-        if is_customer:
-            last_reading = FuelSensorReadings.objects.filter(
-                dispenser_customer_mapping=dispenser_mapping,
-                data_type=31
-            ).order_by("-epoch_time").first()
+        if dispenser_mapping:
+            is_customer = True
         else:
-            last_reading = FuelSensorReadings.objects.filter(
-                dispenser_vehicle_mapping=dispenser_mapping,
-                data_type=31
-            ).order_by("-epoch_time").first()
+            # 2️⃣ Try Vehicle mapping
+            dispenser_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+                dispenser_unit=dispenser,
+                assigned_status=True
+            ).first()
 
-        # If no previous record → create
-        if not last_reading:
-            FuelSensorReadings.objects.create(
-                dispenser_customer_mapping=dispenser_mapping if is_customer else None,
-                dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
-                fuel_level=fuel_level,
-                temperature=fuel_temperature,
-                data_type=31,
-                epoch_time=epoch_time
-            )
-            print(f"[FUEL INSERT] First auto-push record created for IMEI {imei}")
+        if not dispenser_mapping:
+            print(f"[WARN] No customer or vehicle mapping found for IMEI {imei}")
             return
 
-        # Compare with tolerance (recommended)
-        if (
-            abs(float(last_reading.fuel_level) - float(fuel_level)) > 0.01 or
-            abs(float(last_reading.temperature) - float(fuel_temperature)) > 0.1
-        ):
+        # ==========================================
+        # 🚀 CASE 1 → 41 (Transaction Data)
+        # ==========================================
+        if msg_type == 41:
             FuelSensorReadings.objects.create(
                 dispenser_customer_mapping=dispenser_mapping if is_customer else None,
                 dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
                 fuel_level=fuel_level,
                 temperature=fuel_temperature,
-                data_type=31,
+                data_type=41,
+                transaction_id=transaction_id,
                 epoch_time=epoch_time
             )
-            print(f"[FUEL INSERT] Change detected → new auto-push record created for IMEI {imei}")
-        else:
-            print(f"[FUEL SKIP] No change detected for IMEI {imei}")
+            print(f"[FUEL TXN INSERT] Transaction snapshot stored for IMEI {imei}")
+            return
+
+        # ==========================================
+        # 🚀 CASE 2 → 31 (30 sec Auto Push)
+        # ==========================================
+        if msg_type == 31:
+
+            # Fetch latest reading
+            if is_customer:
+                last_reading = FuelSensorReadings.objects.filter(
+                    dispenser_customer_mapping=dispenser_mapping,
+                    data_type=31
+                ).order_by("-epoch_time").first()
+            else:
+                last_reading = FuelSensorReadings.objects.filter(
+                    dispenser_vehicle_mapping=dispenser_mapping,
+                    data_type=31
+                ).order_by("-epoch_time").first()
+
+            # If no previous record → create
+            if not last_reading:
+                FuelSensorReadings.objects.create(
+                    dispenser_customer_mapping=dispenser_mapping if is_customer else None,
+                    dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
+                    fuel_level=fuel_level,
+                    temperature=fuel_temperature,
+                    data_type=31,
+                    epoch_time=epoch_time
+                )
+                print(f"[FUEL INSERT] First auto-push record created for IMEI {imei}")
+                return
+
+            # Compare with tolerance (recommended)
+            if (
+                abs(float(last_reading.fuel_level) - float(fuel_level)) > 0.01 or
+                abs(float(last_reading.temperature) - float(fuel_temperature)) > 0.1
+            ):
+                FuelSensorReadings.objects.create(
+                    dispenser_customer_mapping=dispenser_mapping if is_customer else None,
+                    dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
+                    fuel_level=fuel_level,
+                    temperature=fuel_temperature,
+                    data_type=31,
+                    epoch_time=epoch_time
+                )
+                print(f"[FUEL INSERT] Change detected → new auto-push record created for IMEI {imei}")
+            else:
+                print(f"[FUEL SKIP] No change detected for IMEI {imei}")
 
     @database_sync_to_async
     def update_transaction_log(self, data):
