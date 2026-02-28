@@ -180,11 +180,13 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         "gvr_volume", "gvr_money", "gvr_ppu_level1", "gvr_ppu_level2"
                     ]
 
+                    fuel_data = ["fuel_level","fuel_temperature","epoch_time"]
                     missing_fields = [field for field in required_fields if field not in data]
                     if missing_fields:
                         await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
                         return
 
+                    fuel_data_exists = [field for field in fuel_data if field in data]                   
                     try:
                         imei = data["imei"]
                         print(data["lat"], data["lon"], data["alt_m"])
@@ -208,7 +210,13 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         gvr_volume = int(data["gvr_volume"])
                         gvr_money = int(data["gvr_money"])
                         gvr_ppu_level1 = int(data["gvr_ppu_level1"])
-
+                        if fuel_data_exists:
+                            fuel_temperature = float(data["fuel_temperature"])
+                            fuel_level = float(data["fuel_level"])
+                            epoch_time = int(data["epoch_time"])
+                            msg_type = 31
+                            transaction_id = None
+                            await self.update_fuel_readings(imei, fuel_level, fuel_temperature,epoch_time,msg_type,transaction_id)
                     except (ValueError, TypeError, KeyError) as e:
                         await self.send_error_message(f"Field type conversion error: {e}")
                         return
@@ -228,11 +236,12 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         "imei", "grade", "volume", "money", "ppu",
                         "status", "mstatus", "epoch", "fuel_time", "transaction_id","gvr_money","gvr_volume"
                     ]
+                    fuel_data = ["fuel_level","fuel_temperature","epoch_time"]
                     missing_fields = [f for f in required_fields if f not in data]
                     if missing_fields:
                         await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
                         return
-
+                    fuel_data_exists = [field for field in fuel_data if field in data]  
                     try:
                         imei = str(data["imei"])
                         volume = float(data["volume"]) / 1000.0  # convert to liters
@@ -243,11 +252,19 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         gvr_volume = int(data["gvr_volume"])
                         gvr_money = int(data["gvr_money"])
                         epoch = int(data["epoch"])
+                        user_valid = bool(data["user_valid"])
+                        user_tag_id = str(data["user_tag_id"])
                         dispense_time = dj_timezone.make_aware(
                             datetime.fromtimestamp(epoch),
                             dj_timezone.get_current_timezone()
                         )
                         transaction_id = str(data["transaction_id"])
+                        if fuel_data_exists:
+                            fuel_temperature = float(data["fuel_temperature"])
+                            fuel_level = float(data["fuel_level"])
+                            epoch_time = int(data["epoch_time"])
+                            msg_type = 41
+                            await self.update_fuel_readings(imei, fuel_level, fuel_temperature,epoch_time,msg_type,transaction_id)
                     except (ValueError, TypeError, KeyError) as e:
                         await self.send_error_message(f"Field type conversion error: {e}")
                         return
@@ -264,7 +281,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         dispense_time=dispense_time,
                         fuel_time=fuel_time,
                         gvr_money=gvr_money,
-                        gvr_volume=gvr_volume
+                        gvr_volume=gvr_volume,
+                        user_valid=user_valid,
+                        user_tag_id =user_tag_id
                     )
 
                     # Set status separately
@@ -294,7 +313,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 elif msg_type == 11:
                     required_fields = [
                         "imei", "transaction_id", "preset_state", "preset_volume_req", "preset_amount_req",
-                        "rfid_valid", "vehicle_tag_id", "live_preset_volume", "live_preset_price",
+                        "rfid_valid", "vehicle_tag_id","user_valid","user_tag_id","live_preset_volume", "live_preset_price",
                         "fuel_state", "status"
                     ]
 
@@ -312,7 +331,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         preset_volume_req = float(data["preset_volume_req"])
                         preset_amount_req = float(data["preset_amount_req"])
                         rfid_valid = bool(data["rfid_valid"])
-                        # user_valid = bool(data["user_valid"])
+                        user_valid = bool(data["user_valid"])
+                        user_tag_id = str(data["user_tag_id"])
                         vehicle_tag_id = str(data["vehicle_tag_id"])
                         live_preset_volume = float(data["live_preset_volume"])
                         live_preset_price = float(data["live_preset_price"])
@@ -644,7 +664,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
 
     @database_sync_to_async
-    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time,gvr_money,gvr_volume):
+    def update_dispense_transaction_details(self, transaction_id, imei, ppu, volume, money, dispense_time, fuel_time,gvr_money,gvr_volume,user_valid,user_tag_id):
         txn = None
 
         try:
@@ -674,6 +694,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         txn.dispense_time_taken = fuel_time
         txn.totalizer_volume_ending = gvr_volume / 100
         txn.totalizer_price_ending = gvr_money
+        txn.user_valid = user_valid
+        txn.user_tag_id = user_tag_id
         txn.save(update_fields=[
             "dispenser_live_price",
             "dispenser_received_volume",
@@ -681,12 +703,113 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             "dispense_end_time",
             "dispense_time_taken",
             "totalizer_volume_ending",
-            "totalizer_price_ending"
+            "totalizer_price_ending",
+            "user_valid",
+            "user_tag_id"
         ])
         print(f"[TXN UPDATED] Transaction {transaction_id} updated successfully")
         return {"success": True,"request_status": txn.request_status}
 
+@database_sync_to_async
+def update_fuel_readings(
+    self,
+    imei,
+    fuel_level: float,
+    fuel_temperature: float,
+    epoch_time: int,
+    msg_type: int,
+    transaction_id: str = None
+):
+    try:
+        dispenser = DispenserUnits.objects.get(imei_number=imei)
+    except DispenserUnits.DoesNotExist:
+        print(f"[ERROR] Dispenser with IMEI {imei} not found")
+        return
 
+    dispenser_mapping = None
+    is_customer = False
+
+    # 1️⃣ Try Customer mapping first
+    dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+        dispenser_unit=dispenser,
+        assigned_status=True
+    ).first()
+
+    if dispenser_mapping:
+        is_customer = True
+    else:
+        # 2️⃣ Try Vehicle mapping
+        dispenser_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+            dispenser_unit=dispenser,
+            assigned_status=True
+        ).first()
+
+    if not dispenser_mapping:
+        print(f"[WARN] No customer or vehicle mapping found for IMEI {imei}")
+        return
+
+    # ==========================================
+    # 🚀 CASE 1 → 41 (Transaction Data)
+    # ==========================================
+    if msg_type == 41:
+        FuelSensorReadings.objects.create(
+            dispenser_customer_mapping=dispenser_mapping if is_customer else None,
+            dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
+            fuel_level=fuel_level,
+            temperature=fuel_temperature,
+            data_type=41,
+            transaction_id=transaction_id,
+            epoch_time=epoch_time
+        )
+        print(f"[FUEL TXN INSERT] Transaction snapshot stored for IMEI {imei}")
+        return
+
+    # ==========================================
+    # 🚀 CASE 2 → 31 (30 sec Auto Push)
+    # ==========================================
+    if msg_type == 31:
+
+        # Fetch latest reading
+        if is_customer:
+            last_reading = FuelSensorReadings.objects.filter(
+                dispenser_customer_mapping=dispenser_mapping,
+                data_type=31
+            ).order_by("-epoch_time").first()
+        else:
+            last_reading = FuelSensorReadings.objects.filter(
+                dispenser_vehicle_mapping=dispenser_mapping,
+                data_type=31
+            ).order_by("-epoch_time").first()
+
+        # If no previous record → create
+        if not last_reading:
+            FuelSensorReadings.objects.create(
+                dispenser_customer_mapping=dispenser_mapping if is_customer else None,
+                dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
+                fuel_level=fuel_level,
+                temperature=fuel_temperature,
+                data_type=31,
+                epoch_time=epoch_time
+            )
+            print(f"[FUEL INSERT] First auto-push record created for IMEI {imei}")
+            return
+
+        # Compare with tolerance (recommended)
+        if (
+            abs(float(last_reading.fuel_level) - float(fuel_level)) > 0.01 or
+            abs(float(last_reading.temperature) - float(fuel_temperature)) > 0.1
+        ):
+            FuelSensorReadings.objects.create(
+                dispenser_customer_mapping=dispenser_mapping if is_customer else None,
+                dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
+                fuel_level=fuel_level,
+                temperature=fuel_temperature,
+                data_type=31,
+                epoch_time=epoch_time
+            )
+            print(f"[FUEL INSERT] Change detected → new auto-push record created for IMEI {imei}")
+        else:
+            print(f"[FUEL SKIP] No change detected for IMEI {imei}")
 
     @database_sync_to_async
     def update_transaction_log(self, data):

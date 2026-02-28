@@ -217,6 +217,8 @@ class RequestFuelDispensingDetails(models.Model):
     asset_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag ID")
     asset_tag_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag Type")
     asset_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Type")
+    user_valid = models.BooleanField(default=False)
+    user_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="User Tag ID")
     transaction_id = models.CharField(max_length=255, help_text="Transaction ID")
     dispenser_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Volume")
     dispenser_price = models.FloatField(blank=True,null=True, help_text="Dispenser Price")
@@ -398,6 +400,8 @@ class OrderFuelDispensingDetails(models.Model):
     asset_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag ID")
     asset_tag_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Tag Type")
     asset_type = models.CharField(max_length=255,blank=True,null=True, help_text="Asset Type")
+    user_valid = models.BooleanField(default=False)
+    user_tag_id = models.CharField(max_length=255,blank=True,null=True, help_text="User Tag ID")
     transaction_id = models.CharField(max_length=255, help_text="Transaction ID")
     dispenser_volume = models.FloatField(blank=True,null=True, help_text="Dispenser Volume")
     dispenser_price = models.FloatField(blank=True,null=True, help_text="Dispenser Price")
@@ -429,3 +433,25 @@ class OrderFuelDispensingDetails(models.Model):
         db_table = "order_fuel_dispensing_details"
         verbose_name = "Order Fuel Dispensing Details"
         verbose_name_plural = "Order Fuel Dispensing Details"
+
+
+class FuelSensorReadings(models.Model):
+    DATA_TYPE_CHOICES = [
+        (41, "Transaction Data"),
+        (31, "30 Sec Auto Push"),
+    ]
+    id = models.BigAutoField(primary_key=True)
+    dispenser_customer_mapping = models.ForeignKey('Dispenser_Gun_Mapping_To_Customer',on_delete=models.CASCADE,null=True,blank=True,related_name="fuel_sensor_readings_customer")
+    dispenser_vehicle_mapping = models.ForeignKey('Dispenser_Gun_Mapping_To_Vehicles',on_delete=models.CASCADE,null=True,blank=True,related_name="fuel_sensor_readings_vehicle")
+    temperature = models.FloatField(blank=True,null=True,help_text="Fuel temperature in degree Celsius")
+    fuel_level = models.FloatField(blank=True,null=True,help_text="Fuel level reading")
+    data_type = models.IntegerField(choices=DATA_TYPE_CHOICES,help_text="41 - Transaction Data, 31 - 30 sec Auto Push")
+    epoch_time = models.BigIntegerField(blank=True,null=True,help_text="Unix epoch time sent from device (seconds or milliseconds)")
+    transaction_id = models.CharField(max_length=255,blank=True,null=True, help_text="Transaction ID")
+    class Meta:
+        db_table = "fuel_sensor_readings"
+        verbose_name = "Fuel Sensor Reading"
+        verbose_name_plural = "Fuel Sensor Readings"
+
+
+
