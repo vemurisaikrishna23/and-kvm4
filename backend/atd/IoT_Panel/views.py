@@ -2863,3 +2863,119 @@ class GetOrderFuelDispensingRequestsByOrderId(APIView):
         serializer = GetOrderFuelDispensingDetailsSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class GetFuelReadingsLogsWithDispenserGunMappingCustomerID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, dispenser_gun_mapping_customer_id, format=None):
+
+        start_epoch = request.query_params.get("start_epoch")
+        end_epoch = request.query_params.get("end_epoch")
+        data_type = request.query_params.get("type")   # 👈 New query param
+
+        try:
+            queryset = FuelSensorReadings.objects.filter(
+                dispenser_customer_mapping=dispenser_gun_mapping_customer_id
+            )
+
+            # 🔹 Filter by type if provided
+            if data_type:
+                try:
+                    data_type = int(data_type)
+                    if data_type in [31, 41]:
+                        queryset = queryset.filter(data_type=data_type)
+                    else:
+                        return Response(
+                            {"success": False, "error": "Invalid type. Allowed values: 31 or 41"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except ValueError:
+                    return Response(
+                        {"success": False, "error": "Type must be an integer (31 or 41)"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # 🔹 Apply epoch filters if provided
+            if start_epoch:
+                queryset = queryset.filter(epoch_time__gte=int(start_epoch))
+
+            if end_epoch:
+                queryset = queryset.filter(epoch_time__lte=int(end_epoch))
+
+            queryset = queryset.order_by("epoch_time")
+
+            serializer = GetFuelReadingsLogSerializer(queryset, many=True)
+
+            return Response(
+                {
+                    "data": serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "error": str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+
+class GetFuelReadingsLogsWithDispenserGunMappingVehicleID(APIView):
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, dispenser_gun_mapping_vehicle_id, format=None):
+
+        start_epoch = request.query_params.get("start_epoch")
+        end_epoch = request.query_params.get("end_epoch")
+        data_type = request.query_params.get("type")   # 👈 New query param
+
+        try:
+            queryset = FuelSensorReadings.objects.filter(
+                dispenser_vehicle_mapping=dispenser_gun_mapping_vehicle_id
+            )
+
+            # 🔹 Filter by type if provided
+            if data_type:
+                try:
+                    data_type = int(data_type)
+                    if data_type in [31, 41]:
+                        queryset = queryset.filter(data_type=data_type)
+                    else:
+                        return Response(
+                            {"success": False, "error": "Invalid type. Allowed values: 31 or 41"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except ValueError:
+                    return Response(
+                        {"success": False, "error": "Type must be an integer (31 or 41)"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # 🔹 Apply epoch filters if provided
+            if start_epoch:
+                queryset = queryset.filter(epoch_time__gte=int(start_epoch))
+
+            if end_epoch:
+                queryset = queryset.filter(epoch_time__lte=int(end_epoch))
+
+            queryset = queryset.order_by("epoch_time")
+
+            serializer = GetFuelReadingsLogSerializer(queryset, many=True)
+
+            return Response(
+                {
+                    "data": serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "error": str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )

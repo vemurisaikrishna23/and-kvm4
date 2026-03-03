@@ -89,6 +89,10 @@ urlpatterns = [
     path("order-request-fuel-dispensing/get/route_plan_id/<int:route_plan_id>/", GetOrderFuelDispensingRequestsByRoutePlanId.as_view(), name="get-order-fuel-dispensing-requests-by-route-plan-id"),
     path("order-request-fuel-dispensing/get/route_plan_details_id/<int:route_plan_details_id>/", GetOrderFuelDispensingRequestsByRoutePlanDetailsId.as_view(), name="get-order-fuel-dispensing-requests-by-route-plan-details-id"),
     path("order-request-fuel-dispensing/get/order_id/<int:order_id>/", GetOrderFuelDispensingRequestsByOrderId.as_view(), name="get-order-fuel-dispensing-requests-by-order-id"),
+
+    path("fuel-readings/get/dispenser_gun_mapping_customer_id/<int:dispenser_gun_mapping_customer_id>/", GetFuelReadingsLogsWithDispenserGunMappingCustomerID.as_view(), name="get-fuel-readings-by-dispenser-gun-mapping-customer-id"),
+    path("fuel-readings/get/dispenser_gun_mapping_vehicle_id/<int:dispenser_gun_mapping_vehicle_id>/", GetFuelReadingsLogsWithDispenserGunMappingVehicleID.as_view(), name="get-fuel-readings-by-dispenser-gun-mapping-vehicle-id"),
+   
 ]
 
 

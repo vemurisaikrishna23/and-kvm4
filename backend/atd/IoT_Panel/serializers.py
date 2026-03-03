@@ -3660,3 +3660,9 @@ class GetOrderFuelDispensingDetailsSerializer(serializers.ModelSerializer):
 
         return VehicleBasicSerializer(vehicle).data
 
+
+class GetFuelReadingsLogSerializer(serializers.ModeSerializer):
+    class Meta:
+        model = FuelSensorReadings
+        fields = '__all__'
+
