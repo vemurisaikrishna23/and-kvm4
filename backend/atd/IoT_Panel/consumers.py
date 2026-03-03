@@ -748,6 +748,29 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print(f"[WARN] No customer or vehicle mapping found for IMEI {imei}")
             return
 
+        raw_adc = float(fuel_level)
+        calibration_config = dispenser_mapping.fuel_level_sensor_configuration
+
+        if calibration_config:
+            try:
+                if isinstance(calibration_config, str):
+                    import json
+                    calibration_config = json.loads(calibration_config)
+
+                calibrated_value = self.convert_adc_to_fuel_level(
+                    raw_adc,
+                    calibration_config
+                )
+
+                print(f"[ADC CONVERTED] IMEI={imei} RAW={raw_adc} → CAL={calibrated_value}")
+
+                fuel_level = calibrated_value
+
+            except Exception as e:
+                print(f"[CALIBRATION ERROR] {e}")
+                fuel_level = raw_adc
+        else:
+            fuel_level = raw_adc
         # ==========================================
         # 🚀 CASE 1 → 41 (Transaction Data)
         # ==========================================
@@ -810,6 +833,49 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 print(f"[FUEL INSERT] Change detected → new auto-push record created for IMEI {imei}")
             else:
                 print(f"[FUEL SKIP] No change detected for IMEI {imei}")
+
+    def convert_adc_to_fuel_level(self, adc_value: float, calibration_config: dict):
+        """
+        Convert raw ADC value to calibrated fuel level using interpolation.
+        """
+
+        try:
+            points = calibration_config.get("sensor", {}).get("points", [])
+            if not points:
+                return adc_value  # fallback to raw
+
+            # Sort by code (ADC)
+            points = sorted(points, key=lambda x: x["code"])
+
+            # If below first point
+            if adc_value <= points[0]["code"]:
+                return points[0]["value"]
+
+            # If above last point
+            if adc_value >= points[-1]["code"]:
+                return points[-1]["value"]
+
+            # Linear interpolation
+            for i in range(len(points) - 1):
+                p1 = points[i]
+                p2 = points[i + 1]
+
+                if p1["code"] <= adc_value <= p2["code"]:
+                    x1, y1 = p1["code"], p1["value"]
+                    x2, y2 = p2["code"], p2["value"]
+
+                    # Linear interpolation formula
+                    calibrated_value = y1 + (
+                        (adc_value - x1) * (y2 - y1) / (x2 - x1)
+                    )
+
+                    return round(calibrated_value, 2)
+
+            return adc_value  # fallback
+
+        except Exception as e:
+            print(f"[CALIBRATION ERROR] {e}")
+            return adc_value
 
     @database_sync_to_async
     def update_transaction_log(self, data):
