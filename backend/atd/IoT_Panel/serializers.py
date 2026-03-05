@@ -638,16 +638,42 @@ class CreateDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer)
         return instance
 
 
+class LastFuelSensorReadingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FuelSensorReadings
+        fields = [
+            "fuel_level",
+            "temperature",
+            "epoch_time",
+            "data_type",
+            "transaction_id"
+        ]
+
 class GetDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
     dispenser_unit = GetDispenserUnitsSerializer()
     gun_unit = GetGunUnitsSerializer()
-    # customer = GetCustomersSerializer()
+    last_fuel_reading = serializers.SerializerMethodField()
+
     class Meta:
         model = Dispenser_Gun_Mapping_To_Customer
         fields = '__all__'
         depth = 1
 
+    def get_last_fuel_reading(self, obj):
+        last = FuelSensorReadings.objects.filter(
+            dispenser_customer_mapping=obj
+        ).order_by("-epoch_time").first()
 
+        if not last:
+            return {
+                "fuel_level": None,
+                "temperature": None,
+                "epoch_time": None,
+                "data_type": None,
+                "transaction_id": None
+            }
+
+        return LastFuelSensorReadingSerializer(last).data
 
 
 
@@ -2924,12 +2950,29 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
 class GetDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     dispenser_unit = GetDispenserUnitsSerializer()
     gun_unit = GetGunUnitsSerializer()
+    last_fuel_reading = serializers.SerializerMethodField()
+
     # customer = GetCustomersSerializer()
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
         fields = '__all__'
         depth = 1
 
+    def get_last_fuel_reading(self, obj):
+        last = FuelSensorReadings.objects.filter(
+            dispenser_customer_mapping=obj
+        ).order_by("-epoch_time").first()
+
+        if not last:
+            return {
+                "fuel_level": None,
+                "temperature": None,
+                "epoch_time": None,
+                "data_type": None,
+                "transaction_id": None
+            }
+
+        return LastFuelSensorReadingSerializer(last).data
 
 class VehicleNoSerializer(serializers.Serializer):
     vehicle_no = serializers.CharField(required=True)
