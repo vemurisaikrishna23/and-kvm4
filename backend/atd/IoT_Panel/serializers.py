@@ -510,6 +510,7 @@ class CreateDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer)
     fuel_level_sensor_brand = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
+    tank_capacity = serializers.FloatField(required=False, allow_null=True)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Customer
         fields = [
@@ -527,6 +528,7 @@ class CreateDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer)
             'fuel_level_sensor_brand',
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
+            'tank_capacity',
         ]
 
     def validate_customer(self, value):
@@ -614,7 +616,8 @@ class CreateDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer)
             fuel_level_sensor_type=validated_data.get('fuel_level_sensor_type'),
             fuel_level_sensor_brand=validated_data.get('fuel_level_sensor_brand'),
             fuel_level_sensor_description=validated_data.get('fuel_level_sensor_description'),
-            fuel_level_sensor_configuration=validated_data.get('fuel_level_sensor_configuration'),  
+            fuel_level_sensor_configuration=validated_data.get('fuel_level_sensor_configuration'), 
+            tank_capacity=validated_data.get('tank_capacity'), 
             created_by=(user.id if user else None),
             created_at=timezone.now(),
         )
@@ -874,7 +877,8 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
     fuel_level_sensor_brand = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
-
+    
+    tank_capacity = serializers.FloatField(required=False, allow_null=True)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Customer
         fields = [
@@ -891,6 +895,7 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
             'fuel_level_sensor_brand',
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
+            'tank_capacity',
         ]
 
     # -------------------------------------------------
@@ -957,6 +962,7 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
             'grade',
             'nozzle',
             'remarks',
+            'tank_capacity',
         ]:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
@@ -2786,7 +2792,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
     fuel_level_sensor_brand = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
-
+    tank_capacity = serializers.FloatField(required=False, allow_null=True)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
         fields = [
@@ -2806,6 +2812,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             'fuel_level_sensor_brand',
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
+            'tank_capacity',
         ]
 
     def validate_vehicle(self, value):
@@ -2886,6 +2893,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             nozzle=validated_data['nozzle'],
             dispenser_position=validated_data['dispenser_position'],
             remarks=validated_data.get('remarks'),
+            tank_capacity=validated_data.get('tank_capacity'),
             fuel_level_sensor=validated_data.get('fuel_level_sensor', False),
             fuel_level_sensor_type=validated_data.get('fuel_level_sensor_type'),
             fuel_level_sensor_brand=validated_data.get('fuel_level_sensor_brand'),
@@ -3105,6 +3113,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     # -----------------------------
     # Fuel level sensor fields
     # -----------------------------
+    tank_capacity = serializers.FloatField(required=False, allow_null=True)
     fuel_level_sensor = serializers.BooleanField(required=False)
     fuel_level_sensor_type = serializers.IntegerField(required=False, allow_null=True)
     fuel_level_sensor_brand = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -3124,7 +3133,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'installation_mode',
             'nozzle',
             'remarks',
-
+            'tank_capacity',
             # Fuel fields
             'fuel_level_sensor',
             'fuel_level_sensor_type',
@@ -3201,6 +3210,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'installation_mode',
             'nozzle',
             'remarks',
+            'tank_capacity',
         ]:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
