@@ -210,4 +210,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://anytimediesel.myaccessio.com",
     "https://atd-kvm4.myaccess.cloud",
     "http://atd-kvm4.myaccess.cloud",
+    "https://main.dvnymqmpiotat.amplifyapp.com",
+    "http://main.dvnymqmpiotat.amplifyapp.com",
+    "http://13.235.49.2:8003",
+    "https://13.235.49.2:8003",
 ]
