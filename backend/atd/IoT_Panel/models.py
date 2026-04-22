@@ -2,7 +2,6 @@ from django.db import models
 from existing_tables.models import *
 from django.core.validators import MaxValueValidator
 
-# Create your models here.
 class DispenserUnits(models.Model):
     id = models.BigAutoField(primary_key=True)
     serial_number = models.CharField(max_length=100, blank=True, null=True, unique=True)
@@ -19,9 +18,7 @@ class DispenserUnits(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     created_by = models.PositiveBigIntegerField(blank=True, null=True)
     updated_by = models.PositiveBigIntegerField(blank=True, null=True)
-    # deleted_at = models.DateTimeField(blank=True, null=True)
-    
-   
+       
     class Meta:
         db_table = "dispenser_units"
 
@@ -34,7 +31,7 @@ class GunUnits(models.Model):
     firmware_version = models.CharField(max_length=50, blank=True, null=True)
     hardware_version = models.CharField(max_length=50, blank=True, null=True)
     production_date = models.DateField(blank=True, null=True)
-    rfid_reader_type = models.CharField(max_length=100, blank=True, null=True)   # e.g. UHF, range config
+    rfid_reader_type = models.CharField(max_length=100, blank=True, null=True)
     battery_capacity = models.IntegerField(blank=True, null=True, help_text="mAh")
     backup_hours = models.FloatField(blank=True, null=True, help_text="Estimated backup in hours")
     assigned_status = models.BooleanField(default=False)
@@ -44,7 +41,6 @@ class GunUnits(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     created_by = models.PositiveBigIntegerField(blank=True, null=True)
     updated_by = models.PositiveBigIntegerField(blank=True, null=True)
-    # deleted_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = "gun_units"
@@ -166,12 +162,6 @@ class DeliveryLocation_Mapping_DispenserUnit(models.Model):
 
 
 class RequestFuelDispensingDetails(models.Model):
-    # Request_Status = [
-    #     (0, 'Pending'),
-    #     (1, 'Completed'),
-    #     (2, 'Failed'),
-    # ]
-
     Request_Status = [
         (0, 'Pending'),
         (1, 'Hardware Received'),
@@ -201,7 +191,6 @@ class RequestFuelDispensingDetails(models.Model):
     user_name = models.CharField(max_length=255,blank=True,null=True, help_text="User Name")
     user_email = models.EmailField(blank=True,null=True, help_text="User Email")
     user_phone = models.CharField(max_length=255,blank=True,null=True, help_text="User Phone")
-    # user_tag = models.CharField(max_length=255,blank=True,null=True, help_text="User Phone")
     dispenser_gun_mapping_id = models.BigIntegerField(help_text="Dispenser Gun Mapping ID")
     dispenser_serialnumber = models.CharField(max_length=255, help_text="Dispenser Unit Serial Number")
     dispenser_imeinumber = models.CharField(max_length=255, help_text="Dispenser Unit IMEI Number")
@@ -347,12 +336,6 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
 
 
 class OrderFuelDispensingDetails(models.Model):
-    # Request_Status = [
-    #     (0, 'Pending'),
-    #     (1, 'Completed'),
-    #     (2, 'Failed'),
-    # ]
-
     Request_Status = [
         (0, 'Pending'),
         (1, 'Hardware Received'),
@@ -372,10 +355,6 @@ class OrderFuelDispensingDetails(models.Model):
         (1, 'Amount'),
     ]
 
-    # Request_Vehicle = [
-    #     (0, 'Asset'),
-    #     (1, 'VIN'),
-    # ]
     id = models.BigAutoField(primary_key=True)
     driver_id = models.BigIntegerField(help_text="Driver ID of who is requesting the fuel dispensing")
     driver_name = models.CharField(max_length=255,blank=True,null=True, help_text="Driver Name")

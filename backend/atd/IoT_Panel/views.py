@@ -1,10 +1,8 @@
-# views.py
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, serializers
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from .serializers import *
 from existing_tables.models import *
 from .renderers import *
@@ -29,7 +27,6 @@ def get_user_roles(user_id):
     )
 
 
-#Login
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -38,7 +35,6 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
 
-        # check roles
         roles = (
             ModelHasRoles.objects.filter(model_type="user", model_id=user.id)
             .select_related("role")
@@ -46,13 +42,11 @@ class LoginView(APIView):
         )
         role_names = [r for r in roles if r]
 
-        # enforce IOT Admin only
         if not any(r.lower().replace(" ", "") == "iotadmin" for r in role_names):
             return Response(
                 {'error': 'Access denied (IOT Admin only).'},
                 status=status.HTTP_403_FORBIDDEN
             )
-
         tokens = get_tokens_for_user(user)
         return Response({
             'message': 'Login successful',
@@ -61,7 +55,6 @@ class LoginView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-#For OMS Login API To Django Framework access token
 class ValidateTokenAndGetNewAccessToken(APIView):
     permission_classes = [AllowAny]
 
@@ -102,8 +95,6 @@ class ValidateTokenAndGetNewAccessToken(APIView):
             'role': role,
         }, status=status.HTTP_200_OK)
 
-
-#Get Customers
 class GetCustomers(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -119,8 +110,6 @@ class GetCustomers(APIView):
         else:
             return Response({"error": "You are not authorized to get customers"}, status=status.HTTP_403_FORBIDDEN)
 
-
-# Add Dispenser Unit
 class AddDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -144,7 +133,6 @@ class AddDispenserUnit(APIView):
             return Response({"error": "You are not authorized to add a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Dispenser Units
 class GetDispenserUnits(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -161,7 +149,6 @@ class GetDispenserUnits(APIView):
         else:
             return Response({"error": "You are not authorized to get dispenser units"}, status=status.HTTP_403_FORBIDDEN)
 
-#Get Unassigned Dispenser Units
 class GetUnassignedDispenserUnits(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -178,7 +165,6 @@ class GetUnassignedDispenserUnits(APIView):
         else:
             return Response({"error": "You are not authorized to get unassigned dispenser units"}, status=status.HTTP_403_FORBIDDEN)
 
-#Edit Dispenser Unit
 class EditDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -206,7 +192,6 @@ class EditDispenserUnit(APIView):
             return Response({"error": "You are not authorized to edit a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Delete Dispenser Unit
 class DeleteDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -229,7 +214,6 @@ class DeleteDispenserUnit(APIView):
             return Response({"error": "You are not authorized to delete a dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Add Gun Unit
 class AddGunUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -251,7 +235,6 @@ class AddGunUnit(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-#Get Gun Units
 class GetGunUnits(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -269,7 +252,6 @@ class GetGunUnits(APIView):
             return Response({"error": "You are not authorized to get gun units"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Unassigned Gun Units
 class GetUnassignedGunUnits(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -285,7 +267,6 @@ class GetUnassignedGunUnits(APIView):
         else:
             return Response({"error": "You are not authorized to get unassigned gun units"}, status=status.HTTP_403_FORBIDDEN)
 
-#Edit Gun Unit
 class EditGunUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -312,7 +293,6 @@ class EditGunUnit(APIView):
             return Response({"error": "You are not authorized to edit a gun unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Delete Gun Unit
 class DeleteGunUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -376,7 +356,6 @@ class GetNodeUnits(APIView):
             return Response({"error": "You are not authorized to get node units"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Unassigned Node Units
 class GetUnassignedNodeUnits(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -392,7 +371,6 @@ class GetUnassignedNodeUnits(APIView):
         else:
             return Response({"error": "You are not authorized to get unassigned node units"}, status=status.HTTP_403_FORBIDDEN)
 
-#Edit Node Unit
 class EditNodeUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -419,7 +397,6 @@ class EditNodeUnit(APIView):
             return Response({"error": "You are not authorized to edit a node unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Delete Node Unit
 class DeleteNodeUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -465,7 +442,6 @@ class AddDispenserGunMappingToCustomer(APIView):
             return Response({"error": "You are not authorized to add a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Dispenser Gun Mapping to Customer
 class GetDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -482,7 +458,6 @@ class GetDispenserGunMappingToCustomer(APIView):
             return Response({"error": "You are not authorized to get dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Dispenser Gun Mapping to Customer by Customer ID
 class GetDispenserGunMappingToCustomerByCustomerID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -492,11 +467,8 @@ class GetDispenserGunMappingToCustomerByCustomerID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
         if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
-            # For Accounts Admin, validate that they can only access their customer's data
             if "Accounts Admin" in roles:
                 try:
-                    # Validate using PointOfContacts table
-                    # Check if the user belongs to this customer
                     poc = PointOfContacts.objects.filter(
                         user_id=user_id,
                         belong_to_type='customer',
@@ -508,7 +480,6 @@ class GetDispenserGunMappingToCustomerByCustomerID(APIView):
                             "error": "You are not authorized to access this customer's data"
                         }, status=status.HTTP_403_FORBIDDEN)
                     
-                    # Get dispenser gun mappings for this specific customer
                     dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(
                         customer=customer_id,
                         assigned_status=True
@@ -529,10 +500,6 @@ class GetDispenserGunMappingToCustomerByCustomerID(APIView):
         else:
             return Response({"error": "You are not authorized to get dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
-
-
-
-#Edit Dispenser Gun Mapping to Customer
 class EditDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -559,6 +526,7 @@ class EditDispenserGunMappingToCustomer(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to edit a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
 
 class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -597,7 +565,6 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToCustomer(APIView):
         else:
             return Response({"error": "You are not authorized to edit the status of a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
-#Delete Dispenser Gun Mapping to Customer
 class DeleteDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -623,7 +590,6 @@ class DeleteDispenserGunMappingToCustomer(APIView):
             return Response({"error": "You are not authorized to delete a dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Assign Node Unit & Dispenser Gun Mapping to Customer
 class AssignNodeUnitAndDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -647,7 +613,6 @@ class AssignNodeUnitAndDispenserGunMappingToCustomer(APIView):
             return Response({"error": "You are not authorized to assign a node unit and dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Node Dispenser Customer Mapping
 class GetNodeDispenserCustomerMapping(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -664,7 +629,6 @@ class GetNodeDispenserCustomerMapping(APIView):
             return Response({"error": "You are not authorized to get node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Node Dispenser Customer Mapping by Customer ID
 class GetNodeDispenserCustomerMappingByCustomerID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -681,7 +645,6 @@ class GetNodeDispenserCustomerMappingByCustomerID(APIView):
             return Response({"error": "You are not authorized to get node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Edit Node Dispenser Customer Mapping
 class EditNodeDispenserCustomerMapping(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -708,7 +671,6 @@ class EditNodeDispenserCustomerMapping(APIView):
             return Response({"error": "You are not authorized to edit a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Edit Status and Assigned Status of Node Dispenser Customer Mapping
 class EditStatusAndAssignedStatusOfNodeDispenserCustomerMapping(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -736,7 +698,6 @@ class EditStatusAndAssignedStatusOfNodeDispenserCustomerMapping(APIView):
             return Response({"error": "You are not authorized to edit the status and assigned status of a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Delete Node Dispenser Customer Mapping
 class DeleteNodeDispenserCustomerMapping(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -761,8 +722,6 @@ class DeleteNodeDispenserCustomerMapping(APIView):
             return Response({"error": "You are not authorized to delete a node dispenser customer mapping"}, status=status.HTTP_403_FORBIDDEN)
 
 
-
-# Add Delivery Location Mapping Dispenser Unit
 class AddDeliveryLocationMappingDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -787,7 +746,6 @@ class AddDeliveryLocationMappingDispenserUnit(APIView):
             return Response({"error": "You are not authorized to add a delivery location mapping dispenser unit"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Delivery Location Mapping Dispenser Unit
 class GetDeliveryLocationMappingDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -813,7 +771,6 @@ class GetDeliveryLocationMappingDispenserUnitByCustomerID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
         if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
-            # Validate that customer_id matches the customer from dispenser_gun_mapping_id
             delivery_location_mapping_dispenser_unit = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
                 dispenser_gun_mapping_id__customer=customer_id
             )
@@ -862,7 +819,6 @@ class GetDeliveryLocationMappingDispenserUnitByPOC(APIView):
 
         combined_records = list(direct_matches) + accessible_matches
 
-        # Deduplicate based on dispenser_gun_mapping_id
         unique_records = {}
         for record in combined_records:
             gun_map_id = getattr(record.dispenser_gun_mapping_id, "id", None)
@@ -874,7 +830,6 @@ class GetDeliveryLocationMappingDispenserUnitByPOC(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-#Get Dispenser Gun Mapping List by Delivery Location ID's
 class GetDispenserGunMappingListByDeliveryLocationIDs(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -905,7 +860,6 @@ class GetDispenserGunMappingListByDeliveryLocationIDs(APIView):
             return Response({"error": str(e)}, status=500)
 
 
-#Edit Delivery Location Mapping Dispenser Unit
 class EditDeliveryLocationMappingDispenserUnit(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -965,7 +919,6 @@ class CreateRequestForFuelDispensing(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        print(user_id)
 
         try:
             serializer = CreateRequestForFuelDispensingSerializer(
@@ -980,14 +933,11 @@ class CreateRequestForFuelDispensing(APIView):
                         "data": {"transaction_id": response_data.get("transaction_id")}
                     }, status=status.HTTP_200_OK)
                 except serializers.ValidationError as e:
-                    print("error", e)
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            print("error123", e)
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-#Get Fuel Dispensing Requests
 class GetFuelDispensingRequests(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1004,69 +954,6 @@ class GetFuelDispensingRequests(APIView):
             return Response({"error": "You are not authorized to get fuel dispensing requests"}, status=status.HTTP_403_FORBIDDEN)
 
 
-# Get Fuel Dispensing Requests by Customer ID
-# class GetFuelDispensingRequestsByCustomerID(APIView):
-#     renderer_classes = [IoT_PanelRenderer]
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request, customer_id, format=None):
-#         user = request.user
-#         user_id = getattr(user, "id", None)
-#         roles = get_user_roles(user_id)
-
-#         if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
-
-#             if 'Accounts Admin' in roles:
-#                 # Accounts Admin can fetch only their associated customer's data
-#                 try:
-#                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
-#                     if str(poc.belong_to_id) != str(customer_id):
-#                         return Response(
-#                             {"error": "You are not authorized to view this customer's fuel dispensing requests."},
-#                             status=status.HTTP_403_FORBIDDEN
-#                         )
-#                 except PointOfContacts.DoesNotExist:
-#                     return Response(
-#                         {"error": "User is not associated with any customer."},
-#                         status=status.HTTP_403_FORBIDDEN
-#                     )
-
-#             # Base queryset for this customer
-#             qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
-
-#             start_date_str = request.query_params.get('start_date')
-#             end_date_str = request.query_params.get('end_date')
-
-
-#             if start_date_str:
-#                 try:
-#                     start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-#                     start_dt = datetime.combine(start_date, datetime.min.time())
-#                     qs = qs.filter(request_created_at__gte=start_dt)
-#                 except ValueError:
-#                     return Response({"error": "Invalid start_date format. Use YYYY-MM-DD."},
-#                                     status=status.HTTP_400_BAD_REQUEST)
-
-#             if end_date_str:
-#                 try:
-#                     end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-#                     end_dt = datetime.combine(end_date, datetime.max.time())
-#                     qs = qs.filter(request_created_at__lte=end_dt)
-#                 except ValueError:
-#                     return Response({"error": "Invalid end_date format. Use YYYY-MM-DD."},
-#                                     status=status.HTTP_400_BAD_REQUEST)
-
-#             fuel_dispensing_requests = qs.order_by('-request_created_at')
-#             serializer = GetFuelDispensingRequestsSerializer(fuel_dispensing_requests, many=True)
-#             return Response(serializer.data, status=status.HTTP_200_OK)
-
-#         else:
-#             return Response(
-#                 {"error": "You are not authorized to get fuel dispensing requests."},
-#                 status=status.HTTP_403_FORBIDDEN
-#             )
-
-
 class GetFuelDispensingRequestsByCustomerID(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1075,9 +962,6 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # --------------------------------------------------------------------------------
-        # ROLE VALIDATION
-        # --------------------------------------------------------------------------------
         allowed_roles = [
             'IOT Admin', 'Accounts Admin', 'Dispenser Manager',
             'Location Manager', 'Dispenser'
@@ -1089,9 +973,6 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # --------------------------------------------------------------------------------
-        # ACCOUNTS ADMIN CAN ONLY ACCESS THEIR CUSTOMER
-        # --------------------------------------------------------------------------------
         if 'Accounts Admin' in roles:
             try:
                 poc = PointOfContacts.objects.get(
@@ -1108,17 +989,9 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # --------------------------------------------------------------------------------
-        # BASE QUERYSET
-        # --------------------------------------------------------------------------------
         qs = RequestFuelDispensingDetails.objects.filter(customer_id=customer_id)
 
-        # --------------------------------------------------------------------------------
-        # DISPENSER MANAGER LOGIC
-        # --------------------------------------------------------------------------------
         if 'Dispenser Manager' in roles:
-
-            # 1. Fetch customers assigned to this manager
             manager_customers = list(
                 PointOfContacts.objects.filter(
                     user_id=user_id,
@@ -1126,51 +999,29 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                 ).values_list("belong_to_id", flat=True)
             )
 
-            # 2. Get dispenser-gun mappings for these customers
             assigned_dispensers = list(
                 Dispenser_Gun_Mapping_To_Customer.objects.filter(
                     customer__in=manager_customers
                 ).values_list("dispenser_unit_id", flat=True)
             )
 
-            # 3. Filter transactions belonging to those dispensers
             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
 
-        # --------------------------------------------------------------------------------
-        # LOCATION MANAGER LOGIC
-        # --------------------------------------------------------------------------------
-        # -------------------------------------------------------------------------
-# LOCATION MANAGER LOGIC (IMPROVED + FULLY CORRECT)
-# -------------------------------------------------------------------------
         if 'Location Manager' in roles:
-
-            # 1. Manager assigned locations from POC table
             assigned_locations_raw = list(
                 PointOfContacts.objects.filter(
                     user_id=user_id,
                     belong_to_type="delivery_location"
                 ).values_list("belong_to_id", flat=True)
             )
-
-            # Normalize to integers
             assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
-
-            # Build the filter
             location_filter = Q()
-
-            # Condition 1: direct delivery location match
             location_filter |= Q(delivery_location_id__in=assigned_locations)
-
-            # Condition 2: DU Accessible Locations (JSON list)
             for loc in assigned_locations:
                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
 
             qs = qs.filter(location_filter).distinct()
 
-
-        # --------------------------------------------------------------------------------
-        # DATE FILTERS
-        # --------------------------------------------------------------------------------
         start_date_str = request.query_params.get('start_date')
         end_date_str = request.query_params.get('end_date')
 
@@ -1194,15 +1045,10 @@ class GetFuelDispensingRequestsByCustomerID(APIView):
                     {"error": "Invalid end_date format. Use YYYY-MM-DD."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-
-        # --------------------------------------------------------------------------------
-        # FINAL RESPONSE
-        # --------------------------------------------------------------------------------
         qs = qs.order_by('-request_created_at')
         serializer = GetFuelDispensingRequestsSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-#Get Fuel Dispensing Requests by Dispenser Gun Mapping ID
 class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1229,13 +1075,9 @@ class GetFuelDispensingRequestsByDispenserGunMappingID(APIView):
             requests = RequestFuelDispensingDetails.objects.filter(dispenser_gun_mapping_id=dispenser_gun_mapping_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
         else:
             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
 
-
-
-# Get Fuel Dispensing Requests by Delivery Location ID or Accessible Locations
 class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -1245,7 +1087,6 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # 1️⃣ Validate that delivery location exists
         try:
             delivery_location = DeliveryLocations.objects.get(id=delivery_location_id)
         except DeliveryLocations.DoesNotExist:
@@ -1253,11 +1094,7 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
                 {"error": "Delivery Location ID not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-        # 2️⃣ Access allowed roles
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
-            
-            # 3️⃣ For Accounts Admin → validate customer association
+        if any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):            
             if 'Accounts Admin' in roles:
                 try:
                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
@@ -1272,65 +1109,24 @@ class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
                         {"error": "You are not authorized to access this dispenser's data."},
                         status=status.HTTP_403_FORBIDDEN
                     )
-
-            # 4️⃣ Query 1: direct matches
             direct_matches = RequestFuelDispensingDetails.objects.filter(
                 delivery_location_id=delivery_location_id
             )
-
-            # 5️⃣ Query 2: accessible matches — loop since MySQL doesn't support overlap
             accessible_matches = []
             for req in RequestFuelDispensingDetails.objects.exclude(DU_Accessible_delivery_locations=None):
                 du_list = req.DU_Accessible_delivery_locations or []
                 if isinstance(du_list, list) and delivery_location_id in du_list:
                     accessible_matches.append(req)
-
-            # 6️⃣ Combine both
             all_matches = list(direct_matches) + accessible_matches
-
-            # 7️⃣ Deduplicate (in case same record matched both)
             unique_records = {req.id: req for req in all_matches}
             final_requests = list(unique_records.values())
-
-            # 8️⃣ Serialize
             serializer = GetFuelDispensingRequestsSerializer(final_requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
         else:
             return Response(
                 {"error": "You are not authorized to access this data."},
                 status=status.HTTP_403_FORBIDDEN
             )
-
-
-# #Get Fuel Dispensing Requests by Delivery Location ID
-# class GetFuelDispensingRequestsByDeliveryLocationID(APIView):
-#     renderer_classes = [IoT_PanelRenderer]
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request, delivery_location_id, format=None):
-#         user = request.user
-#         user_id = getattr(user, "id", None)
-#         roles = get_user_roles(user_id)
-#         try:
-#             delivery_location = DeliveryLocations.objects.get(id=delivery_location_id)
-#         except DeliveryLocations.DoesNotExist:
-#             return Response({"error": "Delivery Location ID not found."}, status=status.HTTP_404_NOT_FOUND)
-#         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
-#             if 'Accounts Admin' in roles:
-#                 try:
-#                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
-#                 except PointOfContacts.DoesNotExist:
-#                     return Response({"error": "You are not associated with any customer."}, status=status.HTTP_403_FORBIDDEN)
-
-#                 if delivery_location.customer_id != poc.belong_to_id:
-#                     return Response({"error": "You are not authorized to access this dispenser's data."}, status=status.HTTP_403_FORBIDDEN)
-#             requests = RequestFuelDispensingDetails.objects.filter(delivery_location_id=delivery_location_id).order_by('-request_created_at')
-#             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
-#             return Response(serializer.data, status=status.HTTP_200_OK)
-#         else:
-#             return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
-
 
 
 class ConsumptionPageDashBoardView(APIView):
@@ -1341,17 +1137,11 @@ class ConsumptionPageDashBoardView(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # ----------------------------------------------------------------------
-        # BASE QUERYSET
-        # ----------------------------------------------------------------------
         qs = RequestFuelDispensingDetails.objects.filter(
             customer_id=customer_id,
             dispenser_received_volume__isnull=False
         )
 
-        # ----------------------------------------------------------------------
-        # DATE FILTERS
-        # ----------------------------------------------------------------------
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
 
@@ -1376,11 +1166,6 @@ class ConsumptionPageDashBoardView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # ----------------------------------------------------------------------
-        # ROLE FILTERING — SAME LOGIC FOR BOTH SECTIONS
-        # ----------------------------------------------------------------------
-
-        # ACCOUNTS ADMIN
         if "Accounts Admin" in roles:
             try:
                 poc = PointOfContacts.objects.get(
@@ -1398,7 +1183,6 @@ class ConsumptionPageDashBoardView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # DISPENSER MANAGER
         if "Dispenser Manager" in roles:
 
             assigned_customers = list(
@@ -1415,8 +1199,6 @@ class ConsumptionPageDashBoardView(APIView):
             )
 
             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
-
-        # LOCATION MANAGER
         if "Location Manager" in roles:
 
             assigned_locations_raw = list(
@@ -1434,10 +1216,6 @@ class ConsumptionPageDashBoardView(APIView):
                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
 
             qs = qs.filter(location_filter).distinct()
-
-        # ----------------------------------------------------------------------
-        # 1️⃣ CONSUMING ASSETS
-        # ----------------------------------------------------------------------
         asset_rows = (
             qs.values("asset_id", "asset_name")
             .annotate(
@@ -1463,10 +1241,6 @@ class ConsumptionPageDashBoardView(APIView):
                 "avg_per_transaction": round(avg, 2)
             })
             rank += 1
-
-        # ----------------------------------------------------------------------
-        # 2️⃣ CONSUMING USERS
-        # ----------------------------------------------------------------------
         user_rows = (
             qs.values("user_id", "user_name")
             .annotate(
@@ -1493,14 +1267,10 @@ class ConsumptionPageDashBoardView(APIView):
             })
             rank += 1
 
-        # ----------------------------------------------------------------------
-        # FINAL RESPONSE
-        # ----------------------------------------------------------------------
         return Response({
             "consuming_assets": consuming_assets,
             "consuming_users": consuming_users
         }, status=status.HTTP_200_OK)
-
 
 
 class DailyReconciliationDashBoardView(APIView):
@@ -1511,9 +1281,6 @@ class DailyReconciliationDashBoardView(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # ----------------------------------------------------------
-        # DATE RANGE
-        # ----------------------------------------------------------
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
 
@@ -1529,20 +1296,12 @@ class DailyReconciliationDashBoardView(APIView):
         except:
             return Response({"error": "Invalid date"}, status=400)
 
-        # ----------------------------------------------------------
-        # BASE QUERYSET
-        # ----------------------------------------------------------
         qs = RequestFuelDispensingDetails.objects.filter(
             customer_id=customer_id,
             request_created_at__date__gte=start_date,
             request_created_at__date__lte=end_date
         )
 
-        # ----------------------------------------------------------
-        # ROLE FILTERING
-        # ----------------------------------------------------------
-
-        # ACCOUNTS ADMIN
         if "Accounts Admin" in roles:
             try:
                 poc = PointOfContacts.objects.get(
@@ -1554,7 +1313,6 @@ class DailyReconciliationDashBoardView(APIView):
             except PointOfContacts.DoesNotExist:
                 return Response({"error": "Not authorized"}, status=403)
 
-        # DISPENSER MANAGER
         if "Dispenser Manager" in roles:
             assigned_customers = list(
                 PointOfContacts.objects.filter(
@@ -1571,7 +1329,6 @@ class DailyReconciliationDashBoardView(APIView):
 
             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
 
-        # LOCATION MANAGER
         if "Location Manager" in roles:
             assigned_locations_raw = list(
                 PointOfContacts.objects.filter(
@@ -1589,12 +1346,7 @@ class DailyReconciliationDashBoardView(APIView):
 
             qs = qs.filter(location_filter).distinct()
 
-        # ----------------------------------------------------------
-        # RECONCILIATION PROCESS
-        # ----------------------------------------------------------
         results = []
-
-        # Group by dispenser
         dispensers = qs.values(
             "dispenser_gun_mapping_id",
             "dispenser_serialnumber",
@@ -1613,12 +1365,8 @@ class DailyReconciliationDashBoardView(APIView):
                 ).order_by("request_created_at")
 
                 if daily_qs.exists():
-
-                    # Opening
                     first_rec = daily_qs.first()
                     opening = first_rec.totalizer_volume_starting or 0
-
-                    # Closing
                     last_rec = daily_qs.last()
                     closing = last_rec.totalizer_volume_ending
 
@@ -1632,18 +1380,12 @@ class DailyReconciliationDashBoardView(APIView):
                         else:
                             closing = opening
 
-                    # Total dispensed
                     total_dispensed = round(closing - opening, 2)
-
-                    # Approved volume
                     approved = (
                         daily_qs.aggregate(total=Sum("dispenser_received_volume")).get("total") or 0
                     )
-
                     variance = round(total_dispensed - approved, 2)
-
                     status_label = "Reconciled" if variance == 0 else "Variance"
-
                     results.append({
                         "date": str(current_date),
                         "dispenser_id": disp_id,
@@ -1655,171 +1397,8 @@ class DailyReconciliationDashBoardView(APIView):
                         "variance": variance,
                         "status": status_label
                     })
-
                 current_date += timedelta(days=1)
-
         return Response(results, status=200)
-
-
-
-# class OverviewDashboard(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request, customer_id, format=None):
-#         user = request.user
-#         user_id = getattr(user, "id", None)
-#         roles = get_user_roles(user_id)
-
-#         # ----------------------------------------------------------
-#         # DATE FILTERS (optional but recommended for daywise logs)
-#         # ----------------------------------------------------------
-#         start_date_str = request.query_params.get("start_date")
-#         end_date_str = request.query_params.get("end_date")
-
-#         if start_date_str and end_date_str:
-#             try:
-#                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-#                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-#             except ValueError:
-#                 return Response(
-#                     {"error": "Invalid date format. Use YYYY-MM-DD"},
-#                     status=400
-#                 )
-#         else:
-#             # Default: Last 15 days
-#             end_date = datetime.now().date()
-#             start_date = end_date - timedelta(days=14)
-
-#         # ----------------------------------------------------------
-#         # BASE QUERYSET
-#         # ----------------------------------------------------------
-#         qs = RequestFuelDispensingDetails.objects.filter(
-#             customer_id=customer_id,
-#             request_created_at__date__gte=start_date,
-#             request_created_at__date__lte=end_date
-#         )
-
-#         # ----------------------------------------------------------
-#         # ROLE FILTERING
-#         # ----------------------------------------------------------
-
-#         # ACCOUNTS ADMIN
-#         if "Accounts Admin" in roles:
-#             try:
-#                 poc = PointOfContacts.objects.get(
-#                     user_id=user_id, belong_to_type="customer"
-#                 )
-#                 if str(poc.belong_to_id) != str(customer_id):
-#                     return Response({"error": "Not authorized"}, status=403)
-#             except PointOfContacts.DoesNotExist:
-#                 return Response({"error": "Not authorized"}, status=403)
-
-#         # DISPENSER MANAGER
-#         if "Dispenser Manager" in roles:
-
-#             assigned_customers = list(
-#                 PointOfContacts.objects.filter(
-#                     user_id=user_id, belong_to_type="customer"
-#                 ).values_list("belong_to_id", flat=True)
-#             )
-
-#             assigned_dispensers = list(
-#                 Dispenser_Gun_Mapping_To_Customer.objects.filter(
-#                     customer__in=assigned_customers
-#                 ).values_list("id", flat=True)
-#             )
-
-#             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
-
-#         # LOCATION MANAGER
-#         if "Location Manager" in roles:
-
-#             assigned_locations_raw = list(
-#                 PointOfContacts.objects.filter(
-#                     user_id=user_id, belong_to_type="delivery_location"
-#                 ).values_list("belong_to_id", flat=True)
-#             )
-
-#             assigned_locations = [int(x) for x in assigned_locations_raw if str(x).isdigit()]
-
-#             location_filter = Q(delivery_location_id__in=assigned_locations)
-#             for loc in assigned_locations:
-#                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
-
-#             qs = qs.filter(location_filter).distinct()
-
-#         # ----------------------------------------------------------
-#         # AGGREGATED OVERVIEW (TOP BLOCK)
-#         # ----------------------------------------------------------
-
-#         total_transactions = qs.count()
-
-#         agg = qs.aggregate(
-#             total_volume=Sum("dispenser_received_volume"),
-#             total_price=Sum("dispenser_received_price")
-#         )
-
-#         total_volume_dispensed = agg["total_volume"] or 0
-#         total_price_dispensed = agg["total_price"] or 0
-
-#         total_assets = qs.values("asset_id").distinct().count()
-
-#         # ----------------------------------------------------------
-#         # FUEL AMOUNT CONSUMPTION (DAYWISE LOG)
-#         # ----------------------------------------------------------
-
-#         fuel_amount_consumption = []
-#         current_date = start_date
-
-#         grand_total_volume = 0
-#         grand_total_price = 0
-
-#         while current_date <= end_date:
-
-#             day_qs = qs.filter(request_created_at__date=current_date)
-
-#             if day_qs.exists():
-#                 day_volume = (
-#                     day_qs.aggregate(v=Sum("dispenser_received_volume")).get("v") or 0
-#                 )
-#                 day_price = (
-#                     day_qs.aggregate(p=Sum("dispenser_received_price")).get("p") or 0
-#                 )
-
-#                 grand_total_volume += day_volume
-#                 grand_total_price += day_price
-
-#                 fuel_amount_consumption.append({
-#                     "date": str(current_date),
-#                     "total_volume_dispensed": round(day_volume, 2),
-#                     "total_price_dispensed": round(day_price, 2)
-#                 })
-
-#             current_date += timedelta(days=1)
-
-#         # ----------------------------------------------------------
-#         # FINAL PAYLOAD
-#         # ----------------------------------------------------------
-#         return Response({
-#             "total_transactions": total_transactions,
-#             "total_volume_dispensed": round(total_volume_dispensed, 2),
-#             "total_price_dispensed": round(total_price_dispensed, 2),
-#             "total_assets": total_assets,
-
-#             "fuel_amount_consumption": {
-#                 "daywise": fuel_amount_consumption,
-#                 "grand_total_volume": round(grand_total_volume, 2),
-#                 "grand_total_price": round(grand_total_price, 2)
-#             }
-
-#         }, status=200)
-
-
-from django.db.models import Q, Sum, Count
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from datetime import datetime, timedelta
 
 
 class OverviewDashboard(APIView):
@@ -1829,10 +1408,6 @@ class OverviewDashboard(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-
-        # ----------------------------------------------------------------------
-        # DATE RANGE HANDLING
-        # ----------------------------------------------------------------------
         start_date_str = request.query_params.get("start_date")
         end_date_str = request.query_params.get("end_date")
 
@@ -1846,20 +1421,12 @@ class OverviewDashboard(APIView):
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=14)
 
-        # ----------------------------------------------------------------------
-        # BASE QUERYSET
-        # ----------------------------------------------------------------------
+
         qs = RequestFuelDispensingDetails.objects.filter(
             customer_id=customer_id,
             request_created_at__date__gte=start_date,
             request_created_at__date__lte=end_date
         )
-
-        # ----------------------------------------------------------------------
-        # ROLE LOGIC
-        # ----------------------------------------------------------------------
-
-        # ACCOUNTS ADMIN
         if "Accounts Admin" in roles:
             try:
                 poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
@@ -1868,7 +1435,6 @@ class OverviewDashboard(APIView):
             except PointOfContacts.DoesNotExist:
                 return Response({"error": "Not authorized"}, status=403)
 
-        # DISPENSER MANAGER
         assigned_customers = []
         assigned_dispensers = []
         if "Dispenser Manager" in roles:
@@ -1885,7 +1451,6 @@ class OverviewDashboard(APIView):
 
             qs = qs.filter(dispenser_gun_mapping_id__in=assigned_dispensers)
 
-        # LOCATION MANAGER
         assigned_locations = []
         if "Location Manager" in roles:
             assigned_locations_raw = list(
@@ -1902,10 +1467,6 @@ class OverviewDashboard(APIView):
                 location_filter |= Q(DU_Accessible_delivery_locations__contains=[loc])
 
             qs = qs.filter(location_filter).distinct()
-
-        # ----------------------------------------------------------------------
-        # 1) OVERVIEW STATS
-        # ----------------------------------------------------------------------
         total_transactions = qs.count()
 
         agg = qs.aggregate(
@@ -1916,10 +1477,6 @@ class OverviewDashboard(APIView):
         total_volume_dispensed = round(agg["total_volume"] or 0, 2)
         total_price_dispensed = round(agg["total_price"] or 0, 2)
         total_assets = qs.values("asset_id").distinct().count()
-
-        # ----------------------------------------------------------------------
-        # 2) FUEL & AMOUNT CONSUMPTION (DAYWISE)
-        # ----------------------------------------------------------------------
         fuel_amount_daywise = []
         grand_total_volume = 0
         grand_total_price = 0
@@ -1942,10 +1499,6 @@ class OverviewDashboard(APIView):
                 })
 
             current_date += timedelta(days=1)
-
-        # ----------------------------------------------------------------------
-        # 3) ASSET vs VIN REQUEST COUNT (DAYWISE)
-        # ----------------------------------------------------------------------
         asset_vin_daywise = []
         grand_asset_request_count = 0
         grand_vin_request_count = 0
@@ -1973,12 +1526,6 @@ class OverviewDashboard(APIView):
             current_date += timedelta(days=1)
 
         grand_total_requests = grand_asset_request_count + grand_vin_request_count
-
-        # ----------------------------------------------------------------------
-        # 4) DISPENSER UNIT WISE CONSUMPTION (ALL DISPENSERS)
-        # ----------------------------------------------------------------------
-
-        # Fetch dispensers based on role
         if "Accounts Admin" in roles:
             dispenser_list = list(
                 Dispenser_Gun_Mapping_To_Customer.objects.filter(
@@ -2005,7 +1552,6 @@ class OverviewDashboard(APIView):
             )
         else:
             dispenser_list = []
-
         dispenser_unit_wise = []
         grand_dispenser_total_volume = 0
         grand_dispenser_total_price = 0
@@ -2033,9 +1579,6 @@ class OverviewDashboard(APIView):
                 "transactions_count": tx
             })
 
-        # ----------------------------------------------------------------------
-        # FINAL RESPONSE
-        # ----------------------------------------------------------------------
         return Response({
             "total_transactions": total_transactions,
             "total_volume_dispensed": total_volume_dispensed,
@@ -2065,7 +1608,6 @@ class OverviewDashboard(APIView):
         }, status=200)
 
 
-#Get Fuel Dispensing Requests by Asset ID
 class GetFuelDispensingRequestsByAssetID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2114,7 +1656,6 @@ class GetFuelDispensingRequestsByID(APIView):
         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
 
             if 'Accounts Admin' in roles:
-                # Check if the logged-in user is mapped to the same customer
                 try:
                     poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
                 except PointOfContacts.DoesNotExist:
@@ -2128,7 +1669,6 @@ class GetFuelDispensingRequestsByID(APIView):
         return Response({"error": "You are not authorized to access this data."}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Fuel Dispensing Requests by User ID
 class GetFuelDispensingRequestsByUserID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2142,8 +1682,6 @@ class GetFuelDispensingRequestsByUserID(APIView):
             target_user = Users.objects.get(id=user_id)
         except Users.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        # If Accounts Admin – check if target_user belongs to their customer
         if any(role in roles for role in ['IOT Admin', 'Accounts Admin','Dispenser Manager','Location Manager','Dispenser']):
             if 'Accounts Admin' in roles:
                 try:
@@ -2154,16 +1692,13 @@ class GetFuelDispensingRequestsByUserID(APIView):
                 target_poc = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="customer", belong_to_id=poc.belong_to_id).first()
                 if not target_poc:
                     return Response({"error": "This user does not belong to your customer."}, status=status.HTTP_403_FORBIDDEN)
-            # Valid: same customer
             requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id).order_by('-request_created_at')
             serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # For all other roles – deny
         return Response({"error": "You are not authorized to view fuel dispensing requests."}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Add VIN Vehicle
 class AddVINVehicle(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2172,7 +1707,6 @@ class AddVINVehicle(APIView):
         user = request.user
         roles = get_user_roles(user.id)
 
-        # Only these roles can add VINs
         if not any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager']):
             return Response(
                 {"error": "You are not authorized to add VIN vehicles."},
@@ -2202,27 +1736,23 @@ class GetVINVehicleByVIN(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # 1) VIN exists?
         vin_vehicle = VIN_Vehicle.objects.filter(vin=vin).order_by('-id').first()
         if not vin_vehicle:
             return Response({"error": "VIN not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Already used?
         if vin_vehicle.status is True:
             return Response(
                 {"error": "VIN already used for fuel dispensing."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 2) If POC list is empty -> allow anyone (authenticated) to view
         poc_ids = vin_vehicle.point_of_contact_id or []
         if not poc_ids:
             serializer = GetVINVehicleSerializer(vin_vehicle)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # 3) Role-based access (only enforced when poc_ids is non-empty)
         if 'IOT Admin' in roles:
-            pass  # full access
+            pass
         elif any(role in roles for role in ['Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
             if user_id not in poc_ids:
                 return Response(
@@ -2234,12 +1764,8 @@ class GetVINVehicleByVIN(APIView):
                 {"error": "You are not authorized to access this VIN."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        # 4) OK -> return data
         serializer = GetVINVehicleSerializer(vin_vehicle)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 
 
 class GetVINVehicleByID(APIView):
@@ -2251,15 +1777,13 @@ class GetVINVehicleByID(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # ---------- 1️⃣ Fetch VIN ----------
         try:
             vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
         except VIN_Vehicle.DoesNotExist:
             return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # ---------- 2️⃣ Role-based Authorization ----------
         if "IOT Admin" in roles:
-            pass  # full access
+            pass
 
         elif "Accounts Admin" in roles:
             try:
@@ -2284,8 +1808,6 @@ class GetVINVehicleByID(APIView):
         else:
             return Response({"error": "You are not authorized to view VIN vehicles."},
                             status=status.HTTP_403_FORBIDDEN)
-
-        # ---------- 3️⃣ Serialize and Return ----------
         serializer = GetVINVehicleSerializer(vin_vehicle)
         return Response(serializer.data, status=status.HTTP_200_OK)    
 
@@ -2298,16 +1820,14 @@ class GetVINVehicleByCustomerID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        query_type = request.query_params.get("data", "all").lower()  # all | used | unused
+        query_type = request.query_params.get("data", "all").lower()
 
-        # ---------- 🧩 Role Validation ----------
         if not any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager']):
             return Response(
                 {"error": "You are not authorized to access VINs by customer ID."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # ---------- 🔍 Base Query ----------
         vins = VIN_Vehicle.objects.filter(customer_id=customer_id)
 
         if not vins.exists():
@@ -2315,14 +1835,11 @@ class GetVINVehicleByCustomerID(APIView):
                 {"message": f"No VIN records found for customer ID {customer_id}."},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-        # ---------- 🎚️ Apply “used” or “unused” filter ----------
         if query_type == "used":
             vins = vins.filter(status=True)
         elif query_type == "unused":
             vins = vins.filter(status=False)
 
-        # ---------- 🧾 Accounts Admin Validation ----------
         if 'Accounts Admin' in roles:
             try:
                 poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
@@ -2338,9 +1855,7 @@ class GetVINVehicleByCustomerID(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # ---------- 🧭 Dispenser Manager / Location Manager Validation ----------
         elif any(role in roles for role in ['Dispenser Manager', 'Location Manager']):
-            # Get all delivery locations assigned to this user
             user_pocs = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="delivery_location")
             if not user_pocs.exists():
                 return Response(
@@ -2349,14 +1864,10 @@ class GetVINVehicleByCustomerID(APIView):
                 )
 
             delivery_location_ids = [poc.belong_to_id for poc in user_pocs]
-
-            # Filter VINs by both customer_id and matching delivery locations
             vins = vins.filter(
                 Q(delivery_location_id__contains=delivery_location_ids[0]) |
                 Q(delivery_location_id__icontains=str(delivery_location_ids[0]))
             )
-
-            # For multiple delivery locations, chain OR conditions
             if len(delivery_location_ids) > 1:
                 q_filter = Q()
                 for loc_id in delivery_location_ids:
@@ -2368,8 +1879,6 @@ class GetVINVehicleByCustomerID(APIView):
                     {"message": "No VIN records found for your assigned delivery locations."},
                     status=status.HTTP_404_NOT_FOUND
                 )
-
-        # ---------- ✅ Serialize and Return ----------
         serializer = GetVINVehicleSerializer(vins, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -2384,13 +1893,11 @@ class EditVINVehicle(APIView):
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
 
-        # ---------- 1️⃣ Fetch VIN ----------
         try:
             vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
         except VIN_Vehicle.DoesNotExist:
             return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # ---------- 2️⃣ Initialize Serializer ----------
         serializer = EditVINVehicleSerializer(
             vin_vehicle,
             data=request.data,
@@ -2402,10 +1909,8 @@ class EditVINVehicle(APIView):
             },
         )
 
-        # ---------- 3️⃣ Validate & Save ----------
         serializer.is_valid(raise_exception=True)
-        updated_vin = serializer.save()
-
+        serializer.save()
         return Response(
             {
                 "message": "VIN vehicle updated successfully.",
@@ -2422,23 +1927,17 @@ class DeleteVINVehicle(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-
-        # ---------- 1️⃣ Check VIN existence ----------
         try:
             vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
         except VIN_Vehicle.DoesNotExist:
             return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # ---------- 2️⃣ Initialize Serializer ----------
         serializer = DeleteVINVehicleSerializer(
             vin_vehicle,
             context={"user": user, "roles": roles, "vin_vehicle": vin_vehicle},
         )
 
-        # ---------- 3️⃣ Validation ----------
         serializer.is_valid(raise_exception=True)
-
-        # ---------- 4️⃣ Perform Hard Delete ----------
         serializer.delete(vin_vehicle)
 
         return Response(
@@ -2448,8 +1947,6 @@ class DeleteVINVehicle(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-        
 
 class AddDispenserGunMappingToVehicles(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -2474,7 +1971,6 @@ class AddDispenserGunMappingToVehicles(APIView):
             return Response({"error": "You are not authorized to add a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
 
 
-#Get Dispenser Gun Mapping to Customer
 class GetDispenserGunMappingToVehicles(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2491,8 +1987,6 @@ class GetDispenserGunMappingToVehicles(APIView):
             return Response({"error": "You are not authorized to get dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
 
 
-
-#Get Dispenser Gun Mapping to Vehicles by Vehicle ID
 class GetDispenserGunMappingToVehiclesByID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2506,7 +2000,6 @@ class GetDispenserGunMappingToVehiclesByID(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-#Get Dispenser Gun Mapping to Vehicles by Vehicle ID
 class GetDispenserGunMappingToVehiclesByVehicleID(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2538,8 +2031,6 @@ class GetDispenserGunMappingByVehicleNo(APIView):
         serializer.is_valid(raise_exception=True)
 
         vehicle_no = serializer.validated_data["vehicle_no"]
-
-        # Step 1: Get vehicle
         vehicle = Vehicles.objects.filter(
             vehicle_no=vehicle_no,
             deleted_at__isnull=True
@@ -2551,13 +2042,11 @@ class GetDispenserGunMappingByVehicleNo(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Step 2: Get dispenser-gun mappings
         mappings = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
             vehicle=vehicle.id,
             assigned_status=True
         )
 
-        # Step 3: Serialize response
         response_serializer = GetDispenserGunMappingToVehiclesSerializer(
             mappings, many=True
         )
@@ -2573,7 +2062,6 @@ class GetDispenserGunMappingByVehicleNo(APIView):
 
 
 
-#Edit Dispenser Gun Mapping to Vehicles
 class EditDispenserGunMappingToVehicles(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2638,7 +2126,6 @@ class EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles(APIView):
         else:
             return Response({"error": "You are not authorized to edit the status of a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
 
-#Delete Dispenser Gun Mapping to Vehicles
 class DeleteDispenserGunMappingToVehicles(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -2662,8 +2149,6 @@ class DeleteDispenserGunMappingToVehicles(APIView):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "You are not authorized to delete a dispenser gun mapping to vehicles"}, status=status.HTTP_403_FORBIDDEN)
-
-
 
 
 class CreateOrderRequestForFuelDispensing(APIView):
@@ -2871,14 +2356,12 @@ class GetFuelReadingsLogsWithDispenserGunMappingCustomerID(APIView):
 
         start_epoch = request.query_params.get("start_epoch")
         end_epoch = request.query_params.get("end_epoch")
-        data_type = request.query_params.get("type")   # 👈 New query param
+        data_type = request.query_params.get("type")
 
         try:
             queryset = FuelSensorReadings.objects.filter(
                 dispenser_customer_mapping=dispenser_gun_mapping_customer_id
             )
-
-            # 🔹 Filter by type if provided
             if data_type:
                 try:
                     data_type = int(data_type)
@@ -2895,7 +2378,6 @@ class GetFuelReadingsLogsWithDispenserGunMappingCustomerID(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-            # 🔹 Apply epoch filters if provided
             if start_epoch:
                 queryset = queryset.filter(epoch_time__gte=int(start_epoch))
 
@@ -2930,14 +2412,13 @@ class GetFuelReadingsLogsWithDispenserGunMappingVehicleID(APIView):
 
         start_epoch = request.query_params.get("start_epoch")
         end_epoch = request.query_params.get("end_epoch")
-        data_type = request.query_params.get("type")   # 👈 New query param
+        data_type = request.query_params.get("type") 
 
         try:
             queryset = FuelSensorReadings.objects.filter(
                 dispenser_vehicle_mapping=dispenser_gun_mapping_vehicle_id
             )
 
-            # 🔹 Filter by type if provided
             if data_type:
                 try:
                     data_type = int(data_type)
@@ -2954,7 +2435,6 @@ class GetFuelReadingsLogsWithDispenserGunMappingVehicleID(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-            # 🔹 Apply epoch filters if provided
             if start_epoch:
                 queryset = queryset.filter(epoch_time__gte=int(start_epoch))
 
