@@ -1,4 +1,3 @@
-# your_project/urls.py (or your_app/urls.py and include it)
 from django.urls import path
 from .views import *
 
