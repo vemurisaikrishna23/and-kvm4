@@ -166,19 +166,13 @@ class DeliveryLocation_Mapping_DispenserUnit(models.Model):
 
 
 class RequestFuelDispensingDetails(models.Model):
-    # Request_Status = [
-    #     (0, 'Pending'),
-    #     (1, 'Completed'),
-    #     (2, 'Failed'),
-    # ]
-
     Request_Status = [
         (0, 'Pending'),
         (1, 'Hardware Received'),
         (2, 'Dispensiing'),
         (3, 'Completed'),
-        (4,'Interrupted'),
-        (5,'Failed')
+        (4, 'Interrupted'),
+        (5, 'Failed')
     ]
 
     Validation_Status = [
@@ -189,6 +183,7 @@ class RequestFuelDispensingDetails(models.Model):
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),
+        (2, 'Full Tank Mode')
     ]
 
     Request_Vehicle = [
@@ -370,6 +365,7 @@ class OrderFuelDispensingDetails(models.Model):
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),
+        (2, 'Full Tank Mode')
     ]
 
     # Request_Vehicle = [

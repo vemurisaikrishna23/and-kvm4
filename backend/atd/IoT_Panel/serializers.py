@@ -1952,7 +1952,7 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
     customer_id = serializers.IntegerField()
     asset_id = serializers.CharField()  # ✅ VIN strings supported
     request_vehicle = serializers.ChoiceField(choices=[0, 1])  # 0: Asset, 1: VIN
-    request_type = serializers.ChoiceField(choices=[0, 1])  # 0: Volume, 1: Amount
+    request_type = serializers.ChoiceField(choices=[0, 1, 2])  # 0: Volume, 1: Amount, 2: Full Tank Mode
     dispenser_volume = serializers.FloatField(required=False)
     dispenser_price = serializers.FloatField(required=False)
     buffer_reason = serializers.CharField(required=False, allow_blank=True)
@@ -2185,11 +2185,15 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
                     raise serializers.ValidationError("dispenser_volume is required for Volume type requests.")
                 data["dispenser_volume"] = dispenser_volume
                 data["dispenser_price"] = 0.0
-            else:
+            elif request_type == 1:
                 if dispenser_price is None:
                     raise serializers.ValidationError("dispenser_price is required for Amount type requests.")
                 data["dispenser_price"] = dispenser_price
                 data["dispenser_volume"] = 0.0
+            else:
+                data["dispenser_price"] = 0.0
+                data["dispenser_volume"] = 0.0
+
 
         return data
 
@@ -3436,7 +3440,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
     dispenser_gun_mapping_id = serializers.IntegerField()
     asset_id = serializers.CharField(required=False)  # ✅ VIN strings supported
     asset_name = serializers.CharField(required=False)
-    request_type = serializers.ChoiceField(choices=[0, 1])  # 0: Volume, 1: Amount
+    request_type = serializers.ChoiceField(choices=[0, 1, 2])  # 0: Volume, 1: Amount
     dispenser_volume = serializers.FloatField(required=False)
     dispenser_price = serializers.FloatField(required=False)
     remarks = serializers.CharField(required=False, allow_blank=True)
@@ -3514,7 +3518,6 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid route_plan_id")
         vehicle_id = route_plan.vehicle_id
         data["vehicle_id"] = vehicle_id
-        print("ssssssssssssssssssssssssssssssssss")
 
         # ---------- Validate Dispenser Gun Mapping ----------
         try:
@@ -3611,12 +3614,14 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
                         )
             data["dispenser_volume"] = dispenser_volume
             data["dispenser_price"] = 0.0
-        else:
+        elif request_type==1:
             if dispenser_price is None:
                 raise serializers.ValidationError("dispenser_price is required for Amount type requests.")
             data["dispenser_price"] = dispenser_price
             data["dispenser_volume"] = 0.0
-
+        else:
+            data["dispenser_volume"] = 0.0
+            data["dispenser_price"] = 0.0
         return data
 
     def create(self, validated_data):
