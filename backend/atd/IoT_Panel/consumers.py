@@ -7,7 +7,9 @@ from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 import os
 import django
-from django.db.models import Q
+from django.db.models import Q   # ✅ added
+import random
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'atd.settings')
 django.setup()
 from asgiref.sync import sync_to_async
@@ -275,6 +277,205 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                                 return
                             else:
                                 self.send_data({"type":99,"machine": "hardware","set to true":transaction_id})
+                                print(f"[VIN FLAG] TXN={transaction_id} VIN_Vehicle.status set to True")
+
+                        print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status_result['request_status']} from code={status}")
+                elif msg_type == 61:
+                    # User-tag + IMEI same-customer validation
+                    # Hardware payload (in):
+                    #   { "type": 61, "imei": "...", "user_tag_id": "A_0000006806" }
+                    # Backend reply (out) to hardware uses type 6
+                    required_fields = ["imei", "user_tag_id"]
+                    missing_fields = [f for f in required_fields if f not in data]
+                    if missing_fields:
+                        await self.send_data({
+                            "type": 6,
+                            "status": "error",
+                            "error": f"Missing required fields: {', '.join(missing_fields)}",
+                        })
+                        return
+
+                    try:
+                        imei = str(data["imei"]).strip()
+                        raw_tag = str(data["user_tag_id"]).strip()
+                    except (ValueError, TypeError, KeyError) as e:
+                        await self.send_data({
+                            "type": 6,
+                            "status": "error",
+                            "error": f"Field type conversion error: {e}",
+                        })
+                        return
+
+                    # Parse "A_NNNNNNNN..." → user_id (supports IDs > 10000, any length)
+                    if not raw_tag.startswith("A_"):
+                        await self.send_data({
+                            "type": 6,
+                            "status": "error",
+                            "imei": imei,
+                            "user_tag_id": raw_tag,
+                            "error": f"Invalid user_tag_id '{raw_tag}'. Expected format 'A_<digits>'.",
+                        })
+                        return
+
+                    digits = raw_tag[2:].lstrip("0") or "0"
+                    if not digits.isdigit():
+                        await self.send_data({
+                            "type": 6,
+                            "status": "error",
+                            "imei": imei,
+                            "user_tag_id": raw_tag,
+                            "error": f"Invalid user_tag_id '{raw_tag}': trailing portion must be numeric.",
+                        })
+                        return
+                    user_id = int(digits)
+
+                    # DB validation
+                    result = await self.validate_user_tag_with_dispenser(user_id, imei)
+                    if "error" in result:
+                        await self.send_data({
+                            "type": 6,
+                            "status": "error",
+                            "imei": imei,
+                            "user_tag_id": raw_tag,
+                            "user_id": user_id,
+                            "error": result["error"],
+                        })
+                        return
+
+                    # Success → reply with type 6
+                    await self.send_data({
+                        "type": 6,
+                        "status": "valid",
+                        "imei": imei,
+                        "user_tag_id": raw_tag,
+                        "user_id": result["user_id"],
+                        "user_name": result["user_name"],
+                        "customer_id": result["customer_id"],
+                        "customer_name": result["customer_name"],
+                        "message": "User and dispenser belong to the same customer.",
+                    })
+                    print(
+                        f"[USER-TAG VALIDATION] in=61 out=6 OK tag={raw_tag} "
+                        f"user_id={user_id} IMEI={imei} customer_id={result['customer_id']}"
+                    )
+
+                elif msg_type == 71:
+                    # Asset-tag + User-tag POC validation
+                    #   AND create a Full Tank Mode transaction on success.
+                    # Hardware payload (in):
+                    #   { "type": 62, "imei": "...",
+                    #     "asset_tag_id": "...", "user_tag_id": "A_0000006806" }
+                    # Backend reply (out):
+                    #   - On success: type=1 start-dispense payload (below)
+                    #   - On failure: type=7 with "status":"error"
+                    required_fields = ["imei", "asset_tag_id", "user_tag_id"]
+                    missing_fields = [f for f in required_fields if f not in data]
+                    if missing_fields:
+                        await self.send_data({
+                            "type": 7,
+                            "status": "error",
+                            "error": f"Missing required fields: {', '.join(missing_fields)}",
+                        })
+                        return
+
+                    try:
+                        imei = str(data["imei"]).strip()
+                        asset_tag_id = str(data["asset_tag_id"]).strip()
+                        raw_tag = str(data["user_tag_id"]).strip()
+                    except (ValueError, TypeError, KeyError) as e:
+                        await self.send_data({
+                            "type": 7,
+                            "status": "error",
+                            "error": f"Field type conversion error: {e}",
+                        })
+                        return
+
+                    # Parse "A_NNNNNNNN..." → user_id (handles >10000, any length)
+                    if not raw_tag.startswith("A_"):
+                        await self.send_data({
+                            "type": 7,
+                            "status": "error",
+                            "imei": imei,
+                            "asset_tag_id": asset_tag_id,
+                            "user_tag_id": raw_tag,
+                            "error": f"Invalid user_tag_id '{raw_tag}'. Expected format 'A_<digits>'.",
+                        })
+                        return
+
+                    digits = raw_tag[2:].lstrip("0") or "0"
+                    if not digits.isdigit():
+                        await self.send_data({
+                            "type": 7,
+                            "status": "error",
+                            "imei": imei,
+                            "asset_tag_id": asset_tag_id,
+                            "user_tag_id": raw_tag,
+                            "error": f"Invalid user_tag_id '{raw_tag}': trailing portion must be numeric.",
+                        })
+                        return
+                    user_id = int(digits)
+
+                                        # 1) Validate + resolve all DB references (NO row created yet)
+                    resolved = await self.validate_and_resolve_full_tank_context(
+                        imei=imei,
+                        asset_tag_id=asset_tag_id,
+                        user_id=user_id,
+                        user_tag_raw=raw_tag,
+                    )
+                    if "error" in resolved:
+                        await self.send_data({
+                            "type": 7,
+                            "status": "error",
+                            "imei": imei,
+                            "asset_tag_id": asset_tag_id,
+                            "user_tag_id": raw_tag,
+                            "user_id": user_id,
+                            "error": resolved["error"],
+                        })
+                        return
+
+                    # 2) Send the type=1 start-dispense payload to hardware FIRST
+                    await self.send_data({
+                        "type": 1,
+                        "imei": imei,
+                        "transaction_id": resolved["transaction_id"],
+                        "machine_index": 1,
+                        "grade_index": 1,
+                        "nozzle_index": 1,
+                        "rfid_valid": True,
+                        "vehicle_tag_id": asset_tag_id,
+                        "preset_state": 0,
+                        "preset_volume": 0,
+                        "preset_amount": 0,
+                        "machine": "web",
+                        "user_valid": False,
+                        "user_tag": raw_tag,
+                    })
+                    print(
+                        f"[ASSET-USER POC] in=71 out=1 SENT TXN={resolved['transaction_id']} "
+                        f"IMEI={imei} asset_id={resolved['asset_id']} user_id={user_id} "
+                        f"customer_id={resolved['customer_id']}"
+                    )
+
+                    # 3) THEN create the Full Tank Mode request row
+                    create_result = await self.create_full_tank_request_row(resolved)
+                    if "error" in create_result:
+                        # Hardware already told to start — log loudly; do NOT try
+                        # to retract here. Adjust later if you need a cancel cmd.
+                        print(
+                            f"[ASSET-USER POC][CRITICAL] DB write FAILED after start sent. "
+                            f"TXN={resolved['transaction_id']} IMEI={imei} "
+                            f"reason={create_result['error']}"
+                        )
+                    else:
+                        print(
+                            f"[ASSET-USER POC] TXN row created id={create_result['row_id']} "
+                            f"TXN={resolved['transaction_id']}"
+                        )
+
+
+
+
                 elif msg_type == 11:
                     required_fields = [
                         "imei", "transaction_id", "preset_state", "preset_volume_req", "preset_amount_req",
@@ -455,6 +656,242 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             )
         except DispenserUnits.DoesNotExist:
             print(f"[ERROR] IMEI {imei} not found for price update")
+
+    @database_sync_to_async
+    def validate_user_tag_with_dispenser(self, user_id, imei):
+        """
+        Returns:
+            {"error": "..."}  on any failure
+            {
+              "user_id": int, "user_name": str,
+              "customer_id": int, "customer_name": str
+            } on success
+        """
+        # 1) User exists?
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return {"error": f"User with id {user_id} (from tag) does not exist."}
+
+        # 2) Dispenser exists?
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+        except DispenserUnits.DoesNotExist:
+            return {"error": f"Dispenser with IMEI {imei} does not exist."}
+
+        # 3) Customer(s) the dispenser is mapped to
+        dispenser_customer_ids = set(
+            Dispenser_Gun_Mapping_To_Customer.objects
+            .filter(dispenser_unit_id=dispenser.id)
+            .values_list("customer", flat=True)
+            .distinct()
+        )
+        if not dispenser_customer_ids:
+            return {"error": f"Dispenser IMEI {imei} is not mapped to any customer."}
+
+        # 4) Customer(s) the user belongs to (via PointOfContacts)
+        user_customer_ids = set(
+            PointOfContacts.objects
+            .filter(user_id=user_id, belong_to_type="Customer")
+            .values_list("belong_to_id", flat=True)
+            .distinct()
+        )
+        if not user_customer_ids:
+            return {"error": f"User {user_id} is not associated with any customer."}
+
+        # 5) Same-customer check (intersection)
+        shared = user_customer_ids & dispenser_customer_ids
+        if not shared:
+            return {
+                "error": (
+                    f"User {user_id} and dispenser IMEI {imei} "
+                    f"do not belong to the same customer."
+                )
+            }
+
+        customer_id = next(iter(shared))
+        try:
+            customer = Customers.objects.get(id=customer_id)
+            customer_name = customer.name
+        except Customers.DoesNotExist:
+            customer_name = ""
+
+        return {
+            "user_id": user.id,
+            "user_name": user.name,
+            "customer_id": customer_id,
+            "customer_name": customer_name,
+        }
+
+    @database_sync_to_async
+    def validate_and_resolve_full_tank_context(self, imei, asset_tag_id, user_id, user_tag_raw):
+        """
+        Validate user/asset/dispenser/POC and resolve every field needed to
+        (a) reply to hardware with the start-dispense payload, and
+        (b) create the RequestFuelDispensingDetails row afterwards.
+        Does NOT write to the DB.
+
+        Returns {"error": "..."} on failure, otherwise a dict containing all
+        resolved fields + a freshly generated transaction_id.
+        """
+        # 1) User exists?
+        try:
+            user = Users.objects.get(id=user_id)
+        except Users.DoesNotExist:
+            return {"error": f"User with id {user_id} (from tag) does not exist."}
+
+        # 2) Asset exists by tag_id? (tag_id is not unique → pick latest)
+        asset = Assets.objects.filter(tag_id=asset_tag_id).order_by("-id").first()
+        if asset is None:
+            return {"error": f"Asset with tag_id '{asset_tag_id}' does not exist."}
+
+        customer_id = asset.customer_id
+        if not customer_id:
+            return {"error": f"Asset '{asset.name}' has no customer assigned."}
+
+        # 3) Dispenser exists by IMEI?
+        try:
+            dispenser_unit = DispenserUnits.objects.get(imei_number=imei)
+        except DispenserUnits.DoesNotExist:
+            return {"error": f"Dispenser with IMEI {imei} does not exist."}
+
+        # 4) Is the user a POC of the asset's customer?
+        is_poc = PointOfContacts.objects.filter(
+            user_id=user_id,
+            belong_to_type="customer",
+            belong_to_id=customer_id,
+        ).exists()
+        if not is_poc:
+            return {
+                "error": (
+                    f"User {user_id} is not a Point of Contact for asset "
+                    f"'{asset.name}' (customer {customer_id})."
+                )
+            }
+
+        # 5) Dispenser must be mapped to the asset's customer
+        mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+            dispenser_unit_id=dispenser_unit.id,
+            customer=customer_id,
+        ).first()
+        if mapping is None:
+            return {
+                "error": (
+                    f"Dispenser IMEI {imei} is not mapped to customer "
+                    f"{customer_id} (asset's customer)."
+                )
+            }
+
+        # 6) Delivery-location mapping for this dispenser-gun mapping
+        dl_mapping = DeliveryLocation_Mapping_DispenserUnit.objects.filter(
+            dispenser_gun_mapping_id=mapping.id,
+        ).first()
+        if dl_mapping is None:
+            return {
+                "error": (
+                    f"No delivery-location mapping found for dispenser-gun "
+                    f"mapping {mapping.id}."
+                )
+            }
+        delivery_location_id = dl_mapping.delivery_location_id
+        du_accessible = dl_mapping.DU_Accessible_delivery_locations or []
+
+        try:
+            delivery_location_name = DeliveryLocations.objects.get(
+                id=delivery_location_id
+            ).name
+        except DeliveryLocations.DoesNotExist:
+            delivery_location_name = ""
+
+        # 7) Customer details
+        try:
+            customer = Customers.objects.get(id=customer_id)
+            customer_name = customer.name
+            customer_email = customer.email
+            customer_phone = customer.mobile
+        except Customers.DoesNotExist:
+            customer_name, customer_email, customer_phone = "", "", ""
+
+        # 8) Generate a unique TXN id (TXN + 12 digits)
+        while True:
+            txn_id = "TXN" + str(random.randint(100000000000, 999999999999))
+            if not RequestFuelDispensingDetails.objects.filter(
+                transaction_id=txn_id
+            ).exists():
+                break
+
+        return {
+            "transaction_id": txn_id,
+            "user_id": user.id,
+            "user_name": user.name,
+            "user_email": user.email,
+            "user_phone": user.mobile,
+            "user_tag_id": user_tag_raw,
+            "dispenser_gun_mapping_id": mapping.id,
+            "dispenser_serialnumber": dispenser_unit.serial_number,
+            "dispenser_imeinumber": dispenser_unit.imei_number,
+            "delivery_location_id": delivery_location_id,
+            "delivery_location_name": delivery_location_name,
+            "DU_Accessible_delivery_locations": du_accessible,
+            "customer_id": customer_id,
+            "customer_name": customer_name,
+            "customer_email": customer_email,
+            "customer_phone": customer_phone,
+            "asset_id": asset.id,
+            "asset_name": asset.name,
+            "asset_tag_id": asset.tag_id or "",
+            "asset_tag_type": asset.tag_type or "",
+            "asset_type": asset.type or "",
+        }
+
+
+    @database_sync_to_async
+    def create_full_tank_request_row(self, resolved):
+        """
+        Persist the Full Tank Mode RequestFuelDispensingDetails row using the
+        already-validated context produced by
+        validate_and_resolve_full_tank_context.
+        """
+        try:
+            row = RequestFuelDispensingDetails.objects.create(
+                user_id=resolved["user_id"],
+                user_name=resolved["user_name"],
+                user_email=resolved["user_email"],
+                user_phone=resolved["user_phone"],
+                user_tag_id=resolved["user_tag_id"],
+                dispenser_gun_mapping_id=resolved["dispenser_gun_mapping_id"],
+                dispenser_serialnumber=resolved["dispenser_serialnumber"],
+                dispenser_imeinumber=resolved["dispenser_imeinumber"],
+                delivery_location_id=resolved["delivery_location_id"],
+                delivery_location_name=resolved["delivery_location_name"],
+                DU_Accessible_delivery_locations=resolved["DU_Accessible_delivery_locations"],
+                customer_id=resolved["customer_id"],
+                customer_name=resolved["customer_name"],
+                customer_email=resolved["customer_email"],
+                customer_phone=resolved["customer_phone"],
+                asset_id=resolved["asset_id"],
+                asset_name=resolved["asset_name"],
+                asset_tag_id=resolved["asset_tag_id"],
+                asset_tag_type=resolved["asset_tag_type"],
+                asset_type=resolved["asset_type"],
+                transaction_id=resolved["transaction_id"],
+                dispenser_volume=0.0,
+                dispenser_price=0.0,
+                dispenser_live_price=0.0,
+                request_type=2,        # Full Tank Mode
+                request_vehicle=0,     # Asset
+                request_status=0,      # Pending
+                fuel_state=False,
+                transaction_log={},
+                remarks="Auto-created from hardware tag scan (msg_type=71)",
+                request_created_at=dj_timezone.now(),
+                request_created_by=resolved["user_id"],
+            )
+            return {"row_id": row.id}
+        except Exception as e:
+            return {"error": f"DB write failed: {e}"}
+
+
 
     @database_sync_to_async
     def save_totalizer_and_gps_starting_with_validation(self, transaction_id, imei, totalizer_vol, totalizer_price, gps_data):

@@ -167,8 +167,8 @@ class RequestFuelDispensingDetails(models.Model):
         (1, 'Hardware Received'),
         (2, 'Dispensiing'),
         (3, 'Completed'),
-        (4,'Interrupted'),
-        (5,'Failed')
+        (4, 'Interrupted'),
+        (5, 'Failed')
     ]
 
     Validation_Status = [
@@ -179,6 +179,7 @@ class RequestFuelDispensingDetails(models.Model):
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),
+        (2, 'Full Tank Mode')
     ]
 
     Request_Vehicle = [
@@ -353,6 +354,7 @@ class OrderFuelDispensingDetails(models.Model):
     Request_Type = [
         (0, 'Volume'),
         (1, 'Amount'),
+        (2, 'Full Tank Mode')
     ]
 
     id = models.BigAutoField(primary_key=True)
