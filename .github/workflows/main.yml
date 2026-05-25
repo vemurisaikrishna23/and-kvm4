@@ -38,8 +38,23 @@ jobs:
           script: |
             docker pull myaccess2021/atd-backend:latest
             docker stop atd-backend || true
-            docker rm atd-backend || true
+            docker rm -f atd-backend || true
+            sleep 2
+            # Kill any leftover container on port 8003
+            CONTAINER_ON_PORT=$(docker ps -q --filter "publish=8003")
+            if [ -n "$CONTAINER_ON_PORT" ]; then
+              docker stop $CONTAINER_ON_PORT
+              docker rm -f $CONTAINER_ON_PORT
+            fi
             docker run -d \
               --name atd-backend \
               -p 8003:8000 \
               myaccess2021/atd-backend:latest
+          # script: |
+          #   docker pull myaccess2021/atd-backend:latest
+          #   docker stop atd-backend || true
+          #   docker rm atd-backend || true
+          #   docker run -d \
+          #     --name atd-backend \
+          #     -p 8003:8000 \
+          #     myaccess2021/atd-backend:latest
