@@ -156,18 +156,18 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         print(f"[SKIP PRICE UPDATE] Status = {price_status}")
                 elif msg_type == 31:
                     required_fields = [
-                        "imei", "time_utc", "lat", "lon", "alt_m", 
+                        "imei", "time_utc", "lat", "lon", "alt_m",
                         "sats_used", "speed_kmh", "course_deg", "has_fix",
-                        "gvr_volume", "gvr_money", "gvr_ppu_level1", "gvr_ppu_level2"
+                        "gvr_volume", "gvr_money", "gvr_ppu_level1", "gvr_ppu_level2","epoch"
                     ]
-
-                    fuel_data = ["fuel_level","fuel_temperature","epoch_time"]
+                    obd_data = ["OBDValid","dist_dtc","OBD"]
+                    fuel_data = ["fuel_level","fuel_temperature","fuel_valid"]
                     missing_fields = [field for field in required_fields if field not in data]
                     if missing_fields:
                         await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
                         return
 
-                    fuel_data_exists = [field for field in fuel_data if field in data]                   
+                    fuel_data_exists = [field for field in fuel_data if field in data]
                     try:
                         imei = data["imei"]
                         if data["lat"] == None:
@@ -190,10 +190,11 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         gvr_volume = int(data["gvr_volume"])
                         gvr_money = int(data["gvr_money"])
                         gvr_ppu_level1 = int(data["gvr_ppu_level1"])
-                        if fuel_data_exists:
+                        epoch_time = int(data["epoch"])
+
+                        if fuel_data_exists and data["fuel_valid"]:
                             fuel_temperature = float(data["fuel_temperature"])
                             fuel_level = float(data["fuel_level"])
-                            epoch_time = int(data["epoch_time"])
                             msg_type = 31
                             transaction_id = None
                             await self.update_fuel_readings(imei, fuel_level, fuel_temperature,epoch_time,msg_type,transaction_id)
@@ -208,21 +209,39 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         amount=gvr_money,
                         live_price=gvr_ppu_level1
                     )
+
+                    obd_fields_exist = all(field in data for field in ["OBDValid", "dist_dtc", "OBD"])
+                    if obd_fields_exist and data.get("OBDValid") is True:
+                        obd_payload = data.get("OBD")
+                        dist_dtc_raw = data.get("dist_dtc")
+                        if obd_payload is not None and dist_dtc_raw is not None:
+                            try:
+                                dist_dtc_val = int(dist_dtc_raw)
+                            except (ValueError, TypeError):
+                                dist_dtc_val = None
+                            if dist_dtc_val is not None:
+                                await self.save_obd_gps_reading(imei, True, obd_payload, dist_dtc_val, gps_data, has_fix, epoch_time)
+                    else:
+                        await self.save_obd_gps_reading(imei, False, None, None, gps_data, has_fix, epoch_time)
                 elif msg_type == 41:
                     required_fields = [
                         "imei", "grade", "volume", "money", "ppu",
                         "status", "mstatus", "epoch", "fuel_time", "transaction_id","gvr_money","gvr_volume"
                     ]
-                    fuel_data = ["fuel_level","fuel_temperature","epoch_time"]
+                    fuel_data = ["fuel_level","fuel_temperature","epoch_time","fuel_valid"]
+                    gps_fields = ["lat", "lon", "alt_m", "sats_used", "speed_kmh", "course_deg", "has_fix"]
+                    obd_fields = ["OBDValid","dist_dtc","OBD"]
                     missing_fields = [f for f in required_fields if f not in data]
                     if missing_fields:
                         await self.send_error_message(f"Missing required fields: {', '.join(missing_fields)}")
                         return
-                    fuel_data_exists = [field for field in fuel_data if field in data]  
+                    fuel_data_exists = [field for field in fuel_data if field in data]
+                    gps_data_exists = all(field in data for field in gps_fields)
+                    obd_data_exists = all(field in data for field in obd_fields)
                     try:
                         imei = str(data["imei"])
-                        volume = float(data["volume"]) / 1000.0  
-                        money = float(data["money"]) / 1000.0    
+                        volume = float(data["volume"]) / 1000.0
+                        money = float(data["money"]) / 1000.0
                         ppu = float(data["ppu"])
                         status = int(data["status"])
                         fuel_time = int(data["fuel_time"])
@@ -236,15 +255,49 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                             dj_timezone.get_current_timezone()
                         )
                         transaction_id = str(data["transaction_id"])
-                        if fuel_data_exists:
+                        if fuel_data_exists and data["fuel_valid"]:
                             fuel_temperature = float(data["fuel_temperature"])
                             fuel_level = float(data["fuel_level"])
                             epoch_time = int(data["epoch_time"])
                             msg_type = 41
                             await self.update_fuel_readings(imei, fuel_level, fuel_temperature,epoch_time,msg_type,transaction_id)
+
+                        gps_data_ending = None
+                        has_fix = False
+                        if gps_data_exists:
+                            if data["lat"] == None:
+                                data["lat"] = 0.0
+                            if data["lon"] == None:
+                                data["lon"] = 0.0
+                            if data["alt_m"] == None:
+                                data["alt_m"] = 0.0
+                            gps_data_ending = {
+                                "lat": float(data["lat"]),
+                                "lon": float(data["lon"]),
+                                "alt_m": float(data["alt_m"]),
+                                "sats_used": int(data["sats_used"]),
+                                "speed_kmh": float(data["speed_kmh"]),
+                                "course_deg": float(data["course_deg"]),
+                            }
+                            has_fix = bool(data["has_fix"])
+
+                        obd_payload = None
+                        obd_valid = False
+                        dist_dtc_val = None
+                        if obd_data_exists and data.get("OBDValid") is True:
+                            obd_payload = data.get("OBD")
+                            dist_dtc_raw = data.get("dist_dtc")
+                            if obd_payload is not None and dist_dtc_raw is not None:
+                                try:
+                                    dist_dtc_val = int(dist_dtc_raw)
+                                    obd_valid = True
+                                except (ValueError, TypeError):
+                                    dist_dtc_val = None
+
                     except (ValueError, TypeError, KeyError) as e:
                         await self.send_error_message(f"Field type conversion error: {e}")
                         return
+
                     dispense_transaction_result = await self.update_dispense_transaction_details(
                         transaction_id=transaction_id,
                         imei=imei,
@@ -280,6 +333,23 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                                 print(f"[VIN FLAG] TXN={transaction_id} VIN_Vehicle.status set to True")
 
                         print(f"[REQUEST STATUS UPDATED] TXN={transaction_id} → Status={request_status_result['request_status']} from code={status}")
+
+                    # Save GPS ending + OBD data to the transaction record
+                    if gps_data_ending is not None or obd_valid:
+                        await self.save_gps_ending_and_obd_to_transaction(
+                            transaction_id=transaction_id,
+                            imei=imei,
+                            gps_data_ending=gps_data_ending,
+                            obd_valid=obd_valid,
+                            obd_data=obd_payload,
+                            dist_dtc=dist_dtc_val,
+                        )
+
+                    # Save to VehicleOBDAndGPSReadings history table
+                    if obd_valid and dist_dtc_val is not None:
+                        await self.save_obd_gps_reading(imei, True, obd_payload, dist_dtc_val, gps_data_ending or {}, has_fix, epoch)
+                    elif gps_data_exists:
+                        await self.save_obd_gps_reading(imei, False, None, None, gps_data_ending or {}, has_fix, epoch)
                 elif msg_type == 61:
                     # User-tag + IMEI same-customer validation
                     # Hardware payload (in):
@@ -1244,3 +1314,82 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             return {"ok": True}
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
+
+    @database_sync_to_async
+    def save_obd_gps_reading(self, imei, obd_valid, obd_data, dist_dtc, gps_data, has_fix, epoch_time):
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+        except DispenserUnits.DoesNotExist:
+            print(f"[ERROR] Dispenser with IMEI {imei} not found for OBD/GPS save")
+            return
+
+        vehicle_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+            dispenser_unit=dispenser
+        ).first()
+        if not vehicle_mapping:
+            print(f"[SKIP OBD-GPS] No vehicle mapping for IMEI {imei}")
+            return
+
+        live_odometer = None
+
+        if obd_valid and dist_dtc is not None:
+            odometer_reading = vehicle_mapping.odometer_reading or 0
+            if dist_dtc < 0:
+                print(f"[SKIP OBD-GPS] IMEI={imei} dist_dtc is negative ({dist_dtc}), skipping odometer update")
+            else:
+                live_odometer = odometer_reading + dist_dtc
+                vehicle_mapping.live_odometer_reading = live_odometer
+                vehicle_mapping.save(update_fields=["live_odometer_reading"])
+
+        VehicleOBDAndGPSReadings.objects.create(
+            dispenser_vehicle_mapping=vehicle_mapping,
+            obd_valid=obd_valid,
+            obd_data=obd_data,
+            live_odometer_reading=live_odometer,
+            gps_data=gps_data,
+            has_fix=has_fix,
+            epoch_time=epoch_time,
+        )
+
+    @database_sync_to_async
+    def save_gps_ending_and_obd_to_transaction(self, transaction_id, imei, gps_data_ending, obd_valid, obd_data, dist_dtc):
+        txn = None
+
+        try:
+            txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
+        except RequestFuelDispensingDetails.DoesNotExist:
+            pass
+        if txn is None:
+            try:
+                txn = OrderFuelDispensingDetails.objects.get(transaction_id=transaction_id)
+            except OrderFuelDispensingDetails.DoesNotExist:
+                print(f"[WARN] No Request or Order found for TXN={transaction_id} to save GPS ending/OBD")
+                return
+        if txn.dispenser_imeinumber != imei:
+            print(f"[WARN] IMEI mismatch for TXN={transaction_id}: expected={txn.dispenser_imeinumber}, got={imei}")
+            return
+
+        update_fields = []
+
+        if gps_data_ending is not None:
+            txn.gps_coordinates_ending = gps_data_ending
+            update_fields.append("gps_coordinates_ending")
+
+        if obd_valid and obd_data is not None:
+            txn.obd_data = obd_data
+            update_fields.append("obd_data")
+
+            if dist_dtc is not None and dist_dtc >= 0:
+                dispenser_gun_mapping_id = txn.dispenser_gun_mapping_id
+                vehicle_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+                    id=dispenser_gun_mapping_id
+                ).first()
+                if vehicle_mapping:
+                    odometer_reading = vehicle_mapping.odometer_reading or 0
+                    live_odometer = odometer_reading + dist_dtc
+                    txn.live_odometer_reading = live_odometer
+                    update_fields.append("live_odometer_reading")
+
+        if update_fields:
+            txn.save(update_fields=update_fields)
+            print(f"[TXN OBD-GPS] TXN={transaction_id} updated fields: {update_fields}")

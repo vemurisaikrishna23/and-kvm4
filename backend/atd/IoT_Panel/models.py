@@ -221,6 +221,8 @@ class RequestFuelDispensingDetails(models.Model):
     totalizer_price_ending = models.FloatField(blank=True,null=True, help_text="Totalizer Price at transaction ending")
     gps_coordinates_starting = models.JSONField(blank=True, null=True, help_text="GPS coordinates at transaction starting as JSON: {'lat': ..., 'lon': ...}")
     gps_coordinates_ending = models.JSONField(blank=True, null=True, help_text="GPS coordinates at transaction ending as JSON: {'lat': ..., 'lon': ...}")
+    obd_data = models.JSONField(blank=True, null=True, help_text="Raw OBD data payload from the device as JSON")
+    live_odometer_reading = models.BigIntegerField(blank=True, null=True, help_text="Live odometer reading")
     totalizer_validation = models.IntegerField(default=2, choices=Validation_Status, help_text="Totalizer Reading Validation with previous transaction")
     request_vehicle = models.IntegerField(default=0, choices=Request_Vehicle, help_text="Request Vehicle")
     request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
@@ -404,6 +406,8 @@ class OrderFuelDispensingDetails(models.Model):
     request_type = models.IntegerField(default=0, choices=Request_Type, help_text="Request Type")
     request_status = models.IntegerField(default=0, choices=Request_Status, help_text="Request Status")
     fuel_state = models.BooleanField(default=False)
+    obd_data = models.JSONField(blank=True, null=True, help_text="Raw OBD data payload from the device as JSON")
+    live_odometer_reading = models.BigIntegerField(blank=True, null=True, help_text="Live odometer reading")
     transaction_log = models.JSONField(blank=True, null=True, help_text="log of the transaction")
     dispense_end_time = models.DateTimeField(blank=True, null=True, help_text="Fuel Dispense End Time")
     dispense_time_taken = models.FloatField(blank=True, null=True, help_text="Fuel Dispense Time Taken in seconds")
@@ -440,4 +444,25 @@ class FuelSensorReadings(models.Model):
         verbose_name_plural = "Fuel Sensor Readings"
 
 
+class VehicleOBDAndGPSReadings(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    dispenser_vehicle_mapping = models.ForeignKey(
+        'Dispenser_Gun_Mapping_To_Vehicles',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="obd_gps_readings",
+        help_text="Dispenser-Gun-Vehicle mapping that reported this reading"
+    )
+    obd_valid = models.BooleanField(default=False, help_text="Whether the OBD data received is valid")
+    obd_data = models.JSONField(blank=True, null=True, help_text="Raw OBD data payload from the device as JSON")
+    live_odometer_reading = models.BigIntegerField(blank=True,null=True,help_text="Live Odometer Reading")
+    gps_data = models.JSONField(blank=True, null=True, help_text="GPS coordinates as JSON: {'lat': ..., 'lon': ..., 'alt_m': ..., 'speed_kmh': ..., 'course_deg': ...}")
+    has_fix = models.BooleanField(default=False, help_text="Whether the GPS had a valid fix at the time of reading")
+    epoch_time = models.BigIntegerField(blank=True, null=True, help_text="Unix epoch time sent from device (seconds or milliseconds)")
+
+    class Meta:
+        db_table = "vehicle_obd_and_gps_readings"
+        verbose_name = "Vehicle OBD & GPS Reading"
+        verbose_name_plural = "Vehicle OBD & GPS Readings"
 
