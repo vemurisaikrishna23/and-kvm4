@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'existing_tables',
     'UserAccounts',
     'IoT_Panel',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -157,7 +158,41 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
        'IoT_Panel.auth.ExistingUsersJWTAuthentication',
-    )
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ATD IoT Panel API',
+    'DESCRIPTION': 'API documentation for the ATD IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Orders, and Dashboard.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'TAGS': [
+        {'name': 'Auth', 'description': 'Login and token management'},
+        {'name': 'Customers', 'description': 'Customer lookup'},
+        {'name': 'Dispenser Units', 'description': 'CRUD for dispenser hardware units'},
+        {'name': 'Gun Units', 'description': 'CRUD for gun units'},
+        {'name': 'Node Units', 'description': 'CRUD for node units'},
+        {'name': 'Dispenser-Gun Mapping (Customer)', 'description': 'Map dispenser-gun pairs to customers'},
+        {'name': 'Dispenser-Gun Mapping (Vehicle)', 'description': 'Map dispenser-gun pairs to vehicles'},
+        {'name': 'Node-Dispenser-Customer Mapping', 'description': 'Map node-dispenser pairs to customers'},
+        {'name': 'Delivery Location Mapping', 'description': 'Map delivery locations to dispenser units'},
+        {'name': 'Fuel Dispensing Requests', 'description': 'Create and query fuel dispensing transactions'},
+        {'name': 'VIN Vehicles', 'description': 'Manage VIN-based vehicle records'},
+        {'name': 'Dashboard', 'description': 'Consumption, reconciliation, and overview dashboards'},
+        {'name': 'Order Fuel Dispensing', 'description': 'Order-based fuel dispensing transactions'},
+        {'name': 'Fuel Readings', 'description': 'Fuel sensor reading logs'},
+    ],
+    'COMPONENT_SPLIT_REQUEST': True,
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+        'IoT_Panel.spectacular_hooks.auto_tag_by_url',
+    ],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+    },
 }
 
 
