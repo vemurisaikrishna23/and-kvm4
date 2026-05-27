@@ -248,11 +248,63 @@ def annotate_dgm_vehicle(views):
             summary="Map Dispenser-Gun to Vehicle",
             description=(
                 "Assign a dispenser unit (and optionally a gun unit) to a vehicle. "
-                "Includes totalizer readings, fuel grade, nozzle number, dispenser position, and optional fuel-level sensor config."
+                "**Restricted to IOT Admin role.**\n\n"
+                "## Required fields\n"
+                "| Field | Type | Description |\n"
+                "|---|---|---|\n"
+                "| `vehicle` | int | Primary key of the vehicle (from Vehicles table). Validated for existence. |\n"
+                "| `dispenser_unit` | int | Primary key of the dispenser unit. **Must not be already assigned** (`assigned_status=False`). |\n"
+                "| `totalizer_reading` | float | Current totalizer volume reading at the time of assignment (litres). |\n"
+                "| `total_reading_amount` | float | Current totalizer amount reading at the time of assignment (currency). |\n"
+                "| `live_price` | float | Current fuel price per litre/unit. |\n"
+                "| `grade` | int | Fuel grade/type index (e.g. 1=Diesel, 2=Petrol). |\n"
+                "| `nozzle` | int | Nozzle number on the dispenser. |\n"
+                "| `dispenser_position` | int | Physical position/slot of the dispenser on the vehicle. |\n\n"
+                "## Optional fields\n"
+                "| Field | Type | Description |\n"
+                "|---|---|---|\n"
+                "| `gun_unit` | int or null | Primary key of the gun unit. Must not be already assigned. |\n"
+                "| `installation_mode` | int | 0=Static, 1=Mobility. Defaults to model default. |\n"
+                "| `fuel_level_sensor` | bool | Whether a fuel-level sensor is installed. Default `false`. |\n"
+                "| `fuel_level_sensor_type` | int or null | Sensor type (0=None, 1=Capacitive). Required if `fuel_level_sensor=true`. |\n"
+                "| `fuel_level_sensor_brand` | string | Sensor brand name. |\n"
+                "| `fuel_level_sensor_description` | string | Sensor description. |\n"
+                "| `fuel_level_sensor_configuration` | JSON | Sensor calibration/config data. |\n"
+                "| `tank_capacity` | float or null | Tank capacity in litres. |\n"
+                "| `obd_sensor` | bool | Whether an OBD (odometer) sensor is connected. Default `false`. |\n"
+                "| `odometer_reading` | int or null | Current odometer reading. Required if `obd_sensor=true`. |\n"
+                "| `odometer_mac_id` | string | Bluetooth MAC address of the OBD device. Required if `obd_sensor=true`. |\n"
+                "| `remarks` | string | Free-text notes. |\n\n"
+                "## Validation rules\n"
+                "- The dispenser unit must have `assigned_status=False` (not already assigned to another customer/vehicle).\n"
+                "- The gun unit (if provided) must also have `assigned_status=False`.\n"
+                "- If any fuel sensor detail field is provided, `fuel_level_sensor` must be `true`.\n"
+                "- If any odometer field is provided, `obd_sensor` must be `true`.\n"
+                "- On success, both the dispenser unit and gun unit are marked as `assigned_status=True`.\n\n"
+                "## Responses\n"
+                "- **201**: Mapping created successfully.\n"
+                "- **400**: Validation error (unit already assigned, missing required field, etc.).\n"
+                "- **403**: User does not have IOT Admin role."
             ),
             examples=[
                 OpenApiExample(
-                    "Create Vehicle Mapping",
+                    "Minimal (required fields only)",
+                    description="Assign dispenser #1 to vehicle #10 with no gun unit, no sensors",
+                    value={
+                        "vehicle": 10,
+                        "dispenser_unit": 1,
+                        "totalizer_reading": 5000.00,
+                        "total_reading_amount": 200000.00,
+                        "live_price": 95.50,
+                        "grade": 1,
+                        "nozzle": 1,
+                        "dispenser_position": 1,
+                    },
+                    request_only=True,
+                ),
+                OpenApiExample(
+                    "With gun unit + fuel sensor",
+                    description="Full setup with gun unit and capacitive fuel level sensor",
                     value={
                         "vehicle": 10,
                         "dispenser_unit": 1,
@@ -263,12 +315,52 @@ def annotate_dgm_vehicle(views):
                         "grade": 1,
                         "nozzle": 1,
                         "dispenser_position": 1,
+                        "installation_mode": 1,
                         "fuel_level_sensor": True,
                         "fuel_level_sensor_type": 1,
+                        "fuel_level_sensor_brand": "Omntec",
+                        "fuel_level_sensor_description": "Capacitive probe for diesel",
+                        "fuel_level_sensor_configuration": {"length_mm": 1200, "offset_mm": 50},
                         "tank_capacity": 3000.0,
-                        "remarks": "Tanker truck A",
+                        "remarks": "Tanker truck A — main tank",
                     },
                     request_only=True,
+                ),
+                OpenApiExample(
+                    "With OBD sensor",
+                    description="Setup with OBD odometer sensor connected via Bluetooth",
+                    value={
+                        "vehicle": 10,
+                        "dispenser_unit": 1,
+                        "totalizer_reading": 5000.00,
+                        "total_reading_amount": 200000.00,
+                        "live_price": 95.50,
+                        "grade": 1,
+                        "nozzle": 1,
+                        "dispenser_position": 1,
+                        "obd_sensor": True,
+                        "odometer_reading": 45230,
+                        "odometer_mac_id": "AA:BB:CC:DD:EE:01",
+                    },
+                    request_only=True,
+                ),
+                OpenApiExample(
+                    "Success Response",
+                    value={"message": "Dispenser & Gun Unit Mapping to Vehicles Created Successfully"},
+                    response_only=True,
+                    status_codes=["201"],
+                ),
+                OpenApiExample(
+                    "Error — Dispenser already assigned",
+                    value={"error": "This dispenser unit is already assigned and cannot be allotted."},
+                    response_only=True,
+                    status_codes=["400"],
+                ),
+                OpenApiExample(
+                    "Error — Not authorized",
+                    value={"error": "You are not authorized to add a dispenser gun mapping to vehicles"},
+                    response_only=True,
+                    status_codes=["403"],
                 ),
             ],
         ),

@@ -2052,6 +2052,9 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
     fuel_level_sensor_brand = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
+    obd_sensor = serializers.BooleanField(required=False, default=False)
+    odometer_reading = serializers.IntegerField(required=False, allow_null=True)
+    odometer_mac_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     tank_capacity = serializers.FloatField(required=False, allow_null=True)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
@@ -2073,6 +2076,9 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
             'tank_capacity',
+            'obd_sensor',
+            'odometer_reading',
+            'odometer_mac_id'
         ]
 
     def validate_vehicle(self, value):
@@ -2112,7 +2118,19 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
                 )
             })
 
+        obd_sensor = attrs.get('obd_sensor', False)
+        odometry_fields = [
+            attrs.get('odometer_reading'),
+            attrs.get('odometer_mac_id'),
+        ]
 
+        odom_data_provided = any(v not in [None, '', {}] for v in odometry_fields)
+        if odom_data_provided and not obd_sensor:
+            raise serializers.ValidationError({
+                "obd_sensor": (
+                    "obd_sensor must be enabled to provide odometry details."
+                )
+            })
         return attrs
 
     @transaction.atomic
@@ -2155,6 +2173,9 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             fuel_level_sensor_brand=validated_data.get('fuel_level_sensor_brand'),
             fuel_level_sensor_description=validated_data.get('fuel_level_sensor_description'),
             fuel_level_sensor_configuration=validated_data.get('fuel_level_sensor_configuration'),
+            obd_sensor=validated_data.get('obd_sensor', False),
+            odometer_reading=validated_data.get('odometer_reading'),
+            odometer_mac_id=validated_data.get('odometer_mac_id'),
             assigned_status = True,
             created_by=user.id if user else None,
             created_at=timezone.now(),
