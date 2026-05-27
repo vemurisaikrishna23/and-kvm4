@@ -326,6 +326,8 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
     obd_sensor = models.BooleanField(default=False, help_text="Whether the vehicle is installed with obd sensor or not")
     odometer_reading = models.BigIntegerField(blank=True,null=True,help_text="Odometer Reading")
     odometer_mac_id = models.CharField(max_length=100,blank=True,null=True,db_comment="MAC ID of the odometer device")
+    latest_obd_data = models.JSONField(blank=True, null=True, help_text="Latest data received from the obd sensor")
+    live_odometer_reading = models.BigIntegerField(blank=True,null=True,help_text="Live Odometer Reading")
     tank_capacity = models.FloatField(blank=True,null=True, help_text="Tank Capacity")
     remarks = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(blank=True, null=True)

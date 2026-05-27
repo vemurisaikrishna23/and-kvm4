@@ -1146,9 +1146,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 if p1["code"] <= adc_value <= p2["code"]:
                     x1, y1 = p1["code"], p1["value"]
                     x2, y2 = p2["code"], p2["value"]
-                    calibrated_value = y1 + (
+                    calibrated_value = (y1 + (
                         (adc_value - x1) * (y2 - y1) / (x2 - x1)
-                    )
+                    ))/10.00
 
                     return round(calibrated_value, 2)
 
