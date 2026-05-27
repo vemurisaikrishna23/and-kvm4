@@ -2155,7 +2155,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             fuel_level_sensor_brand=validated_data.get('fuel_level_sensor_brand'),
             fuel_level_sensor_description=validated_data.get('fuel_level_sensor_description'),
             fuel_level_sensor_configuration=validated_data.get('fuel_level_sensor_configuration'),
-
+            assigned_status = True,
             created_by=user.id if user else None,
             created_at=timezone.now(),
         )
@@ -2186,7 +2186,7 @@ class GetDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
 
     def get_last_fuel_reading(self, obj):
         last = FuelSensorReadings.objects.filter(
-            dispenser_customer_mapping=obj
+            dispenser_vehicle_mapping=obj
         ).order_by("-epoch_time").first()
 
         if not last:
