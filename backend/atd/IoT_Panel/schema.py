@@ -245,8 +245,13 @@ def annotate_dgm_customer(views):
 def annotate_dgm_vehicle(views):
     extend_schema_view(
         post=extend_schema(
-            summary="Map Dispenser-Gun to Vehicle",
+            summary="🆕 UPDATED — Map Dispenser-Gun to Vehicle",
             description=(
+                "> ### 🆕 Recent Updates\n"
+                "> Added OBD/odometer sensor support. New optional fields:\n"
+                "> - `obd_sensor` (bool) — enable OBD device\n"
+                "> - `odometer_reading` (int) — initial odometer reading\n"
+                "> - `odometer_mac_id` (string) — OBD device MAC address\n\n"
                 "Assign a dispenser unit (and optionally a gun unit) to a vehicle. "
                 "**Restricted to IOT Admin role.**\n\n"
                 "## Required fields\n"
@@ -376,7 +381,70 @@ def annotate_dgm_vehicle(views):
             examples=[OpenApiExample("Request", value={"vehicle_no": "AP30BA4611"}, request_only=True)],
         ),
     )(views.GetDispenserGunMappingByVehicleNo)
-    extend_schema_view(post=extend_schema(summary="Edit Vehicle Mapping", description="Update a vehicle mapping by its ID."))(views.EditDispenserGunMappingToVehicles)
+    extend_schema_view(
+        post=extend_schema(
+            summary="🆕 UPDATED — Edit Vehicle Mapping",
+            description=(
+                "> ### 🆕 Recent Updates\n"
+                "> Added OBD/odometer sensor support — same as the Create endpoint:\n"
+                "> - `obd_sensor` (bool)\n"
+                "> - `odometer_reading` (int)\n"
+                "> - `odometer_mac_id` (string)\n\n"
+                "Update a dispenser-gun-vehicle mapping by its ID. All fields are optional — only provided fields are updated.\n\n"
+                "## Updatable fields\n"
+                "| Field | Type | Description |\n"
+                "|---|---|---|\n"
+                "| `dispenser_unit` | int | Swap to a new dispenser unit. Must not be already assigned. The previous unit is freed. |\n"
+                "| `gun_unit` | int or null | Swap or unset the gun unit. Must not be already assigned. |\n"
+                "| `totalizer_reading` | float | Update totalizer volume. |\n"
+                "| `total_reading_amount` | float | Update totalizer amount. |\n"
+                "| `live_price` | float | Update current fuel price. |\n"
+                "| `grade` | int | Update fuel grade. |\n"
+                "| `nozzle` | int | Update nozzle number. |\n"
+                "| `dispenser_position` | int | Update dispenser physical position. |\n"
+                "| `installation_mode` | int | 0=Static, 1=Mobility. |\n"
+                "| `tank_capacity` | float | Update tank capacity. |\n"
+                "| `fuel_level_sensor` | bool | Enable/disable fuel level sensor. |\n"
+                "| `fuel_level_sensor_type` | int | Sensor type. Required if `fuel_level_sensor=true`. |\n"
+                "| `fuel_level_sensor_brand` | string | Sensor brand. |\n"
+                "| `fuel_level_sensor_description` | string | Sensor description. |\n"
+                "| `fuel_level_sensor_configuration` | JSON | Calibration config. |\n"
+                "| `obd_sensor` | bool | **🆕 NEW** Enable/disable OBD odometer sensor. |\n"
+                "| `odometer_reading` | int | **🆕 NEW** Update odometer reading. Cleared if `obd_sensor=false`. |\n"
+                "| `odometer_mac_id` | string | **🆕 NEW** OBD device Bluetooth MAC. Cleared if `obd_sensor=false`. |\n"
+                "| `remarks` | string | Free-text notes. |\n\n"
+                "## Validation rules\n"
+                "- If `fuel_level_sensor` is disabled, all fuel sensor sub-fields are cleared.\n"
+                "- If `obd_sensor` is disabled, `odometer_reading` and `odometer_mac_id` are cleared.\n"
+                "- Providing fuel sensor details while `fuel_level_sensor=false` → validation error.\n"
+                "- Providing odometer details while `obd_sensor=false` → validation error.\n"
+                "- Swapping dispenser/gun unit frees the previous unit's `assigned_status`."
+            ),
+            examples=[
+                OpenApiExample(
+                    "Update OBD fields",
+                    description="Enable OBD sensor and set odometer details",
+                    value={
+                        "obd_sensor": True,
+                        "odometer_reading": 47120,
+                        "odometer_mac_id": "AA:BB:CC:DD:EE:01",
+                    },
+                    request_only=True,
+                ),
+                OpenApiExample(
+                    "Update live price only",
+                    value={"live_price": 96.25},
+                    request_only=True,
+                ),
+                OpenApiExample(
+                    "Disable OBD sensor",
+                    description="Disabling clears odometer_reading and odometer_mac_id",
+                    value={"obd_sensor": False},
+                    request_only=True,
+                ),
+            ],
+        ),
+    )(views.EditDispenserGunMappingToVehicles)
     extend_schema_view(post=extend_schema(summary="Edit Status of Vehicle Mapping", description="Toggle status and/or assigned_status of a vehicle mapping."))(views.EditStatusAndAssignedStatusOfDispenserGunMappingToVehicles)
     extend_schema_view(delete=extend_schema(summary="Delete Vehicle Mapping", description="Remove a vehicle mapping by its ID."))(views.DeleteDispenserGunMappingToVehicles)
 
@@ -445,12 +513,14 @@ def annotate_dl_mapping(views):
 def annotate_fuel_dispensing(views):
     extend_schema_view(
         post=extend_schema(
-            summary="Create Fuel Dispensing Request",
+            summary="🆕 UPDATED — Create Fuel Dispensing Request",
             description=(
+                "> ### 🆕 Recent Updates\n"
+                "> Added support for **Full Tank Mode** (`request_type=2`) — dispenses until the tank is full, no preset volume/price required. Available for Asset-based requests only (not VIN).\n\n"
                 "Create a new fuel dispensing transaction. Supports three request types:\n\n"
                 "- **request_type=0 (Volume)**: dispenser_volume is required (litres). dispenser_price must be omitted.\n"
                 "- **request_type=1 (Amount)**: dispenser_price is required (currency). dispenser_volume must be omitted.\n"
-                "- **request_type=2 (Full Tank Mode)**: Neither volume nor price is required — the dispenser runs until the tank is full.\n\n"
+                "- **request_type=2 (Full Tank Mode) 🆕**: Neither volume nor price is required — the dispenser runs until the tank is full.\n\n"
                 "Supports two vehicle modes:\n"
                 "- **request_vehicle=0 (Asset)**: Provide asset_id (integer) and delivery_location_id.\n"
                 "- **request_vehicle=1 (VIN)**: Provide asset_id (VIN string). Delivery location is resolved from the VIN record. "
@@ -633,12 +703,14 @@ def annotate_dashboard(views):
 def annotate_order_dispensing(views):
     extend_schema_view(
         post=extend_schema(
-            summary="Create Order Fuel Dispensing Request",
+            summary="🆕 UPDATED — Create Order Fuel Dispensing Request",
             description=(
+                "> ### 🆕 Recent Updates\n"
+                "> Added support for **Full Tank Mode** (`request_type=2`) — dispenses until tank is full, no preset volume/price required.\n\n"
                 "Create a fuel dispensing transaction linked to an order/route plan. Validates against remaining order quantity.\n\n"
                 "- **request_type=0 (Volume)**: dispenser_volume required. Checked against remaining order quantity.\n"
                 "- **request_type=1 (Amount)**: dispenser_price required.\n"
-                "- **request_type=2 (Full Tank)**: No preset needed — device dispenses until full.\n\n"
+                "- **request_type=2 (Full Tank Mode) 🆕**: No preset needed — device dispenses until full.\n\n"
                 "The asset can be provided by ID (existing asset) or by name (ad-hoc asset for the trip)."
             ),
             examples=[
