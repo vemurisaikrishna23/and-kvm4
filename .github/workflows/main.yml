@@ -34,7 +34,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
             docker pull myaccess2021/atd-backend:latest
             docker stop atd-backend || true
