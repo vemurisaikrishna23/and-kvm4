@@ -211,18 +211,24 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     )
 
                     obd_fields_exist = all(field in data for field in ["OBDValid", "dist_dtc", "OBD"])
+                    obd_valid_flag = False
+                    obd_payload = None
+                    dist_dtc_val = None
                     if obd_fields_exist and data.get("OBDValid") is True:
-                        obd_payload = data.get("OBD")
+                        payload = data.get("OBD")
                         dist_dtc_raw = data.get("dist_dtc")
-                        if obd_payload is not None and dist_dtc_raw is not None:
+                        if payload is not None and dist_dtc_raw is not None:
                             try:
                                 dist_dtc_val = int(dist_dtc_raw)
+                                obd_valid_flag = True
+                                obd_payload = payload
                             except (ValueError, TypeError):
                                 dist_dtc_val = None
-                            if dist_dtc_val is not None:
-                                await self.save_obd_gps_reading(imei, True, obd_payload, dist_dtc_val, gps_data, has_fix, epoch_time)
-                    else:
-                        await self.save_obd_gps_reading(imei, False, None, None, gps_data, has_fix, epoch_time)
+
+                    await self.save_obd_gps_reading(
+                        imei, obd_valid_flag, obd_payload, dist_dtc_val,
+                        gps_data, has_fix, epoch_time
+                    )
                 elif msg_type == 41:
                     required_fields = [
                         "imei", "grade", "volume", "money", "ppu",
@@ -346,10 +352,17 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         )
 
                     # Save to VehicleOBDAndGPSReadings history table
-                    if obd_valid and dist_dtc_val is not None:
-                        await self.save_obd_gps_reading(imei, True, obd_payload, dist_dtc_val, gps_data_ending or {}, has_fix, epoch)
-                    elif gps_data_exists:
-                        await self.save_obd_gps_reading(imei, False, None, None, gps_data_ending or {}, has_fix, epoch)
+                    obd_valid_flag = bool(obd_valid and dist_dtc_val is not None)
+                    if obd_valid_flag or gps_data_exists:
+                        await self.save_obd_gps_reading(
+                            imei,
+                            obd_valid_flag,
+                            obd_payload if obd_valid_flag else None,
+                            dist_dtc_val if obd_valid_flag else None,
+                            gps_data_ending or {},
+                            has_fix,
+                            epoch,
+                        )
                 elif msg_type == 61:
                     # User-tag + IMEI same-customer validation
                     # Hardware payload (in):
@@ -1330,7 +1343,12 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print(f"[SKIP OBD-GPS] No vehicle mapping for IMEI {imei}")
             return
 
+        if not obd_valid and not has_fix:
+            print(f"[SKIP OBD-GPS] IMEI={imei} OBD invalid and no GPS fix — nothing to save")
+            return
+
         live_odometer = None
+        saved_obd_data = None
 
         if obd_valid and dist_dtc is not None:
             odometer_reading = vehicle_mapping.odometer_reading or 0
@@ -1340,13 +1358,16 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 live_odometer = odometer_reading + dist_dtc
                 vehicle_mapping.live_odometer_reading = live_odometer
                 vehicle_mapping.save(update_fields=["live_odometer_reading"])
+            saved_obd_data = obd_data
+
+        saved_gps_data = gps_data if has_fix else None
 
         VehicleOBDAndGPSReadings.objects.create(
             dispenser_vehicle_mapping=vehicle_mapping,
             obd_valid=obd_valid,
-            obd_data=obd_data,
+            obd_data=saved_obd_data,
             live_odometer_reading=live_odometer,
-            gps_data=gps_data,
+            gps_data=saved_gps_data,
             has_fix=has_fix,
             epoch_time=epoch_time,
         )

@@ -2402,6 +2402,141 @@ class GetFuelReadingsLogsWithDispenserGunMappingCustomerID(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class GetVehicleSensorDataByMappingID(APIView):
+    """
+    Returns OBD, GPS, and fuel data for a Dispenser_Gun_Mapping_To_Vehicles record.
+
+    Two modes:
+      1. No query params  → returns the most recent OBD/GPS/fuel values (single objects).
+      2. ?start_epoch=&end_epoch=  → returns lists of records within that epoch range.
+
+    Missing data types are returned as empty ({} in latest mode, [] in range mode).
+    """
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, dispenser_vehicle_mapping_id, format=None):
+        try:
+            mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.get(id=dispenser_vehicle_mapping_id)
+        except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
+            return Response(
+                {"error": "Dispenser Gun Mapping To Vehicle with this ID not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        start_epoch = request.query_params.get("start_epoch")
+        end_epoch = request.query_params.get("end_epoch")
+
+        if start_epoch is not None or end_epoch is not None:
+            try:
+                start_val = int(start_epoch) if start_epoch is not None else None
+                end_val = int(end_epoch) if end_epoch is not None else None
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "start_epoch and end_epoch must be integers (Unix epoch seconds)"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            obd_gps_qs = VehicleOBDAndGPSReadings.objects.filter(dispenser_vehicle_mapping=mapping)
+            fuel_qs = FuelSensorReadings.objects.filter(dispenser_vehicle_mapping=mapping)
+
+            if start_val is not None:
+                obd_gps_qs = obd_gps_qs.filter(epoch_time__gte=start_val)
+                fuel_qs = fuel_qs.filter(epoch_time__gte=start_val)
+            if end_val is not None:
+                obd_gps_qs = obd_gps_qs.filter(epoch_time__lte=end_val)
+                fuel_qs = fuel_qs.filter(epoch_time__lte=end_val)
+
+            obd_gps_qs = obd_gps_qs.order_by("epoch_time")
+            fuel_qs = fuel_qs.order_by("epoch_time")
+
+            obd_records = []
+            gps_records = []
+            for row in obd_gps_qs:
+                gps_records.append({
+                    "gps_data": row.gps_data or {},
+                    "has_fix": row.has_fix,
+                    "epoch_time": row.epoch_time,
+                })
+                if row.obd_valid and row.obd_data is not None:
+                    obd_records.append({
+                        "obd_data": row.obd_data,
+                        "live_odometer_reading": row.live_odometer_reading,
+                        "epoch_time": row.epoch_time,
+                    })
+
+            fuel_records = [
+                {
+                    "fuel_level": row.fuel_level,
+                    "temperature": row.temperature,
+                    "data_type": row.data_type,
+                    "transaction_id": row.transaction_id,
+                    "epoch_time": row.epoch_time,
+                }
+                for row in fuel_qs
+            ]
+
+            return Response(
+                {
+                    "dispenser_vehicle_mapping_id": mapping.id,
+                    "start_epoch": start_val,
+                    "end_epoch": end_val,
+                    "obd_data": obd_records,
+                    "gps_data": gps_records,
+                    "fuel_data": fuel_records,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        latest_obd = VehicleOBDAndGPSReadings.objects.filter(
+            dispenser_vehicle_mapping=mapping, obd_valid=True
+        ).order_by("-epoch_time").first()
+
+        latest_gps = VehicleOBDAndGPSReadings.objects.filter(
+            dispenser_vehicle_mapping=mapping
+        ).order_by("-epoch_time").first()
+
+        latest_fuel = FuelSensorReadings.objects.filter(
+            dispenser_vehicle_mapping=mapping
+        ).order_by("-epoch_time").first()
+
+        obd_payload = {}
+        if latest_obd is not None and latest_obd.obd_data is not None:
+            obd_payload = {
+                "obd_data": latest_obd.obd_data,
+                "live_odometer_reading": latest_obd.live_odometer_reading,
+                "epoch_time": latest_obd.epoch_time,
+            }
+
+        gps_payload = {}
+        if latest_gps is not None and latest_gps.gps_data:
+            gps_payload = {
+                "gps_data": latest_gps.gps_data,
+                "has_fix": latest_gps.has_fix,
+                "epoch_time": latest_gps.epoch_time,
+            }
+
+        fuel_payload = {}
+        if latest_fuel is not None:
+            fuel_payload = {
+                "fuel_level": latest_fuel.fuel_level,
+                "temperature": latest_fuel.temperature,
+                "data_type": latest_fuel.data_type,
+                "transaction_id": latest_fuel.transaction_id,
+                "epoch_time": latest_fuel.epoch_time,
+            }
+
+        return Response(
+            {
+                "dispenser_vehicle_mapping_id": mapping.id,
+                "obd_data": obd_payload,
+                "gps_data": gps_payload,
+                "fuel_data": fuel_payload,
+            },
+            status=status.HTTP_200_OK,
+        )
         
 
 class GetFuelReadingsLogsWithDispenserGunMappingVehicleID(APIView):

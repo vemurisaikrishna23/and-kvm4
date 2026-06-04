@@ -13,7 +13,7 @@ admin.site.register(VIN_Vehicle)
 admin.site.register(Dispenser_Gun_Mapping_To_Vehicles)
 admin.site.register(OrderFuelDispensingDetails)
 admin.site.register(FuelSensorReadings)
-
+admin.site.register(VehicleOBDAndGPSReadings)
 
 
 

@@ -780,6 +780,117 @@ def annotate_fuel_readings(views):
 
 
 # ──────────────────────────────────────────────
+#  VEHICLE SENSOR DATA (combined OBD + GPS + fuel)
+# ──────────────────────────────────────────────
+def annotate_vehicle_sensor_data(views):
+    extend_schema_view(
+        get=extend_schema(
+            summary="🆕 NEW — Get Vehicle Sensor Data (OBD + GPS + Fuel)",
+            description=(
+                "> ### 🆕 New Endpoint\n"
+                "> Returns combined OBD, GPS, and fuel sensor data for a specific `Dispenser_Gun_Mapping_To_Vehicles` record.\n\n"
+                "## Two modes of operation\n\n"
+                "**1. Latest mode** — Call without query params.\n"
+                "Returns the **most recent** OBD, GPS, and fuel record as single objects (or `{}` if no data of that type exists).\n\n"
+                "**2. Range mode** — Call with `start_epoch` and/or `end_epoch` query params.\n"
+                "Returns **lists** of all records within the epoch range (or `[]` if no data of that type exists in the range).\n\n"
+                "## Behaviour notes\n"
+                "- `obd_data` is populated only when the device reported `OBDValid=True`. GPS-only records are skipped in the `obd_data` list.\n"
+                "- `gps_data` is populated from every `VehicleOBDAndGPSReadings` row (every push contains GPS).\n"
+                "- `fuel_data` comes from `FuelSensorReadings` (only when the device reports valid fuel data).\n"
+                "- Records older than 7 days are auto-purged from `VehicleOBDAndGPSReadings`, so this endpoint will not return OBD/GPS data older than that.\n\n"
+                "## Responses\n"
+                "- **200**: Data returned (empty fields if no records).\n"
+                "- **404**: Mapping ID not found.\n"
+                "- **400**: Invalid `start_epoch` / `end_epoch` value."
+            ),
+            parameters=[
+                OpenApiParameter(
+                    name="start_epoch", type=int, location=OpenApiParameter.QUERY,
+                    required=False, description="Unix epoch (seconds). Filters records on or after this time."
+                ),
+                OpenApiParameter(
+                    name="end_epoch", type=int, location=OpenApiParameter.QUERY,
+                    required=False, description="Unix epoch (seconds). Filters records on or before this time."
+                ),
+            ],
+            examples=[
+                OpenApiExample(
+                    "Latest mode (no query params) — full data",
+                    value={
+                        "dispenser_vehicle_mapping_id": 5,
+                        "mode": "latest",
+                        "obd_data": {
+                            "obd_data": {"rpm": 1200, "coolant_temp": 78, "fuel_lvl_pct": 65},
+                            "live_odometer_reading": 47125,
+                            "epoch_time": 1716800000,
+                        },
+                        "gps_data": {
+                            "gps_data": {"lat": 17.4, "lon": 78.5, "alt_m": 540.0, "speed_kmh": 0.0, "course_deg": 0.0, "sats_used": 8},
+                            "has_fix": True,
+                            "epoch_time": 1716800000,
+                        },
+                        "fuel_data": {
+                            "fuel_level": 28.5,
+                            "temperature": 31.2,
+                            "data_type": 31,
+                            "transaction_id": None,
+                            "epoch_time": 1716800000,
+                        },
+                    },
+                    response_only=True,
+                    status_codes=["200"],
+                ),
+                OpenApiExample(
+                    "Latest mode — only GPS available (no OBD or fuel)",
+                    value={
+                        "dispenser_vehicle_mapping_id": 5,
+                        "mode": "latest",
+                        "obd_data": {},
+                        "gps_data": {
+                            "gps_data": {"lat": 17.4, "lon": 78.5, "alt_m": 540.0, "speed_kmh": 0.0, "course_deg": 0.0, "sats_used": 8},
+                            "has_fix": True,
+                            "epoch_time": 1716800000,
+                        },
+                        "fuel_data": {},
+                    },
+                    response_only=True,
+                    status_codes=["200"],
+                ),
+                OpenApiExample(
+                    "Range mode — ?start_epoch=1716800000&end_epoch=1716886400",
+                    value={
+                        "dispenser_vehicle_mapping_id": 5,
+                        "mode": "range",
+                        "start_epoch": 1716800000,
+                        "end_epoch": 1716886400,
+                        "obd_data": [
+                            {"obd_data": {"rpm": 1200}, "live_odometer_reading": 47125, "epoch_time": 1716800000},
+                            {"obd_data": {"rpm": 1250}, "live_odometer_reading": 47135, "epoch_time": 1716800030},
+                        ],
+                        "gps_data": [
+                            {"gps_data": {"lat": 17.4, "lon": 78.5}, "has_fix": True, "epoch_time": 1716800000},
+                            {"gps_data": {"lat": 17.4, "lon": 78.5}, "has_fix": True, "epoch_time": 1716800030},
+                        ],
+                        "fuel_data": [
+                            {"fuel_level": 28.5, "temperature": 31.2, "data_type": 31, "transaction_id": None, "epoch_time": 1716800000},
+                        ],
+                    },
+                    response_only=True,
+                    status_codes=["200"],
+                ),
+                OpenApiExample(
+                    "Error — Mapping not found",
+                    value={"error": "Dispenser Gun Mapping To Vehicle with this ID not found"},
+                    response_only=True,
+                    status_codes=["404"],
+                ),
+            ],
+        ),
+    )(views.GetVehicleSensorDataByMappingID)
+
+
+# ──────────────────────────────────────────────
 #  HELPER: Bind request serializer to POST/PUT/PATCH views that drf-spectacular
 #  can't auto-detect (plain APIViews without serializer_class).
 # ──────────────────────────────────────────────
@@ -893,3 +1004,4 @@ def apply_all_annotations():
     annotate_dashboard(views)
     annotate_order_dispensing(views)
     annotate_fuel_readings(views)
+    annotate_vehicle_sensor_data(views)

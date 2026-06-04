@@ -33,6 +33,7 @@ TAG_MAP = [
     ('/api/dashboard/',                                      'Dashboard'),
     ('/api/order-request-fuel-dispensing/',                  'Order Fuel Dispensing'),
     ('/api/fuel-readings/',                                  'Fuel Readings'),
+    ('/api/vehicle-sensor-data/',                            'Vehicle Sensor Data'),
 ]
 
 

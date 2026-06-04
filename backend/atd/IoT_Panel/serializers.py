@@ -130,6 +130,7 @@ class EditDispenserUnitSerializer(serializers.ModelSerializer):
         user = self.context.get("user", None)
         instance.serial_number = validated_data.get('serial_number', instance.serial_number)
         instance.imei_number = validated_data.get('imei_number', instance.imei_number)
+        instance.batch_number = validated_data.get('batch_number', instance.batch_number)
         instance.mac_address = validated_data.get('mac_address', instance.mac_address)
         instance.firmware_version = validated_data.get('firmware_version', instance.firmware_version)
         instance.hardware_version = validated_data.get('hardware_version', instance.hardware_version)
@@ -1897,6 +1898,7 @@ class GetVINVehicleSerializer(serializers.ModelSerializer):
 
 
 class EditVINVehicleSerializer(serializers.ModelSerializer):
+    dispense_volume = serializers.FloatField(required=False, allow_null=True)
     class Meta:
         model = VIN_Vehicle
         fields = [
@@ -1906,6 +1908,7 @@ class EditVINVehicleSerializer(serializers.ModelSerializer):
             "capacity",
             "dg_kv",
             "customer_id",
+            "dispense_volume"
         ]
 
     def validate(self, data):
@@ -2249,6 +2252,9 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     fuel_level_sensor_brand = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
+    obd_sensor = serializers.BooleanField(required=False)
+    odometer_reading = serializers.IntegerField(required=False, allow_null=True)
+    odometer_mac_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
@@ -2269,6 +2275,9 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'fuel_level_sensor_brand',
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
+            'obd_sensor',
+            'odometer_reading',
+            'odometer_mac_id',
         ]
 
     def validate(self, attrs):
@@ -2291,6 +2300,21 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 "fuel_level_sensor": (
                     "fuel_level_sensor must be enabled to provide fuel sensor details."
+                )
+            })
+
+        obd_sensor = attrs.get('obd_sensor', instance.obd_sensor)
+
+        odometry_fields = [
+            attrs.get('odometer_reading', instance.odometer_reading),
+            attrs.get('odometer_mac_id', instance.odometer_mac_id),
+        ]
+
+        odom_data_provided = any(v not in [None, '', {}] for v in odometry_fields)
+        if odom_data_provided and not obd_sensor:
+            raise serializers.ValidationError({
+                "obd_sensor": (
+                    "obd_sensor must be enabled to provide odometry details."
                 )
             })
 
@@ -2355,6 +2379,20 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             instance.fuel_level_sensor_brand = None
             instance.fuel_level_sensor_description = None
             instance.fuel_level_sensor_configuration = None
+
+        obd_sensor = validated_data.get('obd_sensor', instance.obd_sensor)
+        instance.obd_sensor = obd_sensor
+
+        if obd_sensor:
+            instance.odometer_reading = validated_data.get(
+                'odometer_reading', instance.odometer_reading
+            )
+            instance.odometer_mac_id = validated_data.get(
+                'odometer_mac_id', instance.odometer_mac_id
+            )
+        else:
+            instance.odometer_reading = None
+            instance.odometer_mac_id = None
 
         if '_new_dispenser_unit' in validated_data:
             new_du = DispenserUnits.objects.select_for_update().get(

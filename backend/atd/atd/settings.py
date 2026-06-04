@@ -162,9 +162,141 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
+_WEBSOCKET_DOCS = """
+API documentation for the ATD IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Orders, and Dashboard.
+
+---
+
+# 🔌 WebSocket Protocol (Dispenser Control Channel)
+
+The dispenser hardware and the web dashboard talk to the backend over a single WebSocket channel.
+This protocol is **not REST** — the endpoints below this section are HTTP. WebSocket messages are documented here for reference.
+
+## Connection
+
+```
+ws://<host>/ws/dispenser-control/?imei_number=<IMEI>&token=<TOKEN>&client_type=hardware|web
+```
+
+| Query param | Purpose |
+|---|---|
+| `imei_number` | IMEI of the dispenser unit |
+| `token` | XOR-encoded `<imei>\\|<checksum>\\|<timestamp>` token, base64-encoded |
+| `client_type` | `hardware` (the IoT device) or `web` (the dashboard) |
+
+**Reject codes:**
+- `4001` — Token invalid or IMEI mismatch
+- `4002` — Invalid `client_type`
+- `4003` — IMEI not assigned
+
+Every message must include `"type"` (int) and `"machine"` (`"hardware"` or `"web"`).
+
+---
+
+## Inbound Messages (Hardware → Backend)
+
+### `type: 4` — Machine Status Update
+```json
+{ "type": 4, "machine": "hardware", "imei": "...", "mstatus": 1 }
+```
+Updates `Dispenser_Gun_Mapping_*.machine_status` (1=Idle, 0=Offline, 2=Dispensing, 3=Allocated, 4=Error).
+
+### `type: 51` — Price Update
+```json
+{ "type": 51, "machine": "hardware", "imei": "...",
+  "price_update_status": "success", "volume": 12345, "money": 678900, "ppu_level1": 9550 }
+```
+Updates `live_totalizer_reading`, `live_total_reading_amount`, `live_price`.
+
+### `type: 31` — Auto-Push (every ~30 seconds)
+GPS + optionally fuel-level + optionally OBD data.
+```json
+{ "type": 31, "machine": "hardware", "imei": "...",
+  "time_utc": "...", "lat": 17.4, "lon": 78.5, "alt_m": 540.0,
+  "sats_used": 8, "speed_kmh": 0.0, "course_deg": 0.0, "has_fix": true,
+  "gvr_volume": 12345, "gvr_money": 678900, "gvr_ppu_level1": 9550, "gvr_ppu_level2": 0,
+  "epoch_time": 1716800000,
+  "fuel_level": 1023, "fuel_temperature": 28.5, "fuel_valid": true,
+  "OBDValid": true, "dist_dtc": 245, "OBD": { "rpm": 0, "coolant_temp": 75 } }
+```
+Saves to `FuelSensorReadings` (if fuel data valid) and `VehicleOBDAndGPSReadings`.
+
+### `type: 11` — Dispense State Update
+Sent during a transaction. Updates preset state and totalizer-starting values.
+
+### `type: 41` — Dispense Final
+Sent at end of dispense. Saves final volume, money, GPS-ending, OBD data to `RequestFuelDispensingDetails` or `OrderFuelDispensingDetails`.
+```json
+{ "type": 41, "machine": "hardware", "imei": "...", "transaction_id": "TXN...",
+  "grade": 1, "volume": 50500, "money": 4775250, "ppu": 9550,
+  "status": 203, "mstatus": 1, "epoch": 1716800100, "fuel_time": 120,
+  "gvr_volume": 12846, "gvr_money": 1156725,
+  "user_valid": true, "user_tag_id": "A_0000006806",
+  "lat": 17.4, "lon": 78.5, "has_fix": true,
+  "OBDValid": true, "dist_dtc": 12, "OBD": { ... } }
+```
+
+### `type: 61` — User-Tag + IMEI Same-Customer Validation
+```json
+{ "type": 61, "machine": "hardware", "imei": "...", "user_tag_id": "A_0000006806" }
+```
+Backend parses user_id from `A_NNNNN...`, checks user and dispenser share a customer.
+**Backend replies with `type: 6`** (status `valid` or `error`).
+
+### `type: 71` — Asset-Tag + User-Tag POC Validation + Auto-Create Full Tank Transaction
+```json
+{ "type": 71, "machine": "hardware", "imei": "...",
+  "asset_tag_id": "RFID...", "user_tag_id": "A_0000006806" }
+```
+Validates: user exists, asset exists by `tag_id`, user is POC of asset's customer, dispenser is mapped to the same customer.
+- **On success:** Creates a Full Tank Mode `RequestFuelDispensingDetails` row and replies with `type: 1` start-dispense command.
+- **On failure:** Replies with `type: 7` error payload.
+
+---
+
+## Outbound Messages (Backend → Hardware)
+
+### `type: 1` — Start Dispense Command (response to type 71 success)
+```json
+{ "type": 1, "imei": "...", "transaction_id": "TXN874821666714",
+  "machine_index": 1, "grade_index": 1, "nozzle_index": 1, "rfid_valid": true,
+  "vehicle_tag_id": "<asset_tag>", "preset_state": 0,
+  "preset_volume": 0, "preset_amount": 0,
+  "machine": "web", "user_valid": false, "user_tag": "A_0000006806" }
+```
+
+### `type: 6` — User-Tag Validation Response (response to type 61)
+```json
+{ "type": 6, "status": "valid", "imei": "...", "user_tag_id": "A_...",
+  "user_id": 6806, "user_name": "...", "customer_id": 42, "customer_name": "...",
+  "message": "User and dispenser belong to the same customer." }
+```
+Failure form: `{"type": 6, "status": "error", "error": "..."}`
+
+### `type: 7` — Asset/POC Validation Error (response to type 71 failure)
+```json
+{ "type": 7, "status": "error", "imei": "...",
+  "asset_tag_id": "...", "user_tag_id": "...", "error": "..." }
+```
+
+### `type: 99` — VIN Flag Acknowledgement
+Sent after a VIN-based transaction completes (msg_type 41).
+
+---
+
+## Persistence side-effects
+
+| When | What gets written |
+|---|---|
+| `type: 31` arrives | `FuelSensorReadings` (msg_type 31 row if fuel valid), `VehicleOBDAndGPSReadings` (OBD+GPS or GPS-only), `Dispenser_Gun_Mapping_*.gps_coordinates`, `Dispenser_Gun_Mapping_*.live_odometer_reading` |
+| `type: 41` arrives | Final dispense fields, `gps_coordinates_ending`, `obd_data`, `live_odometer_reading` on the transaction row |
+| `type: 71` arrives | New `RequestFuelDispensingDetails` row with `request_type=2`, `request_vehicle=0` |
+| Cleanup | `VehicleOBDAndGPSReadings` records older than 7 days are deleted on each new write |
+"""
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'ATD IoT Panel API',
-    'DESCRIPTION': 'API documentation for the ATD IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Orders, and Dashboard.',
+    'DESCRIPTION': _WEBSOCKET_DOCS,
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'TAGS': [
@@ -182,6 +314,7 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Dashboard', 'description': 'Consumption, reconciliation, and overview dashboards'},
         {'name': 'Order Fuel Dispensing', 'description': 'Order-based fuel dispensing transactions'},
         {'name': 'Fuel Readings', 'description': 'Fuel sensor reading logs'},
+        {'name': 'Vehicle Sensor Data', 'description': 'Combined OBD, GPS, and fuel sensor data per vehicle mapping'},
     ],
     'COMPONENT_SPLIT_REQUEST': True,
     'POSTPROCESSING_HOOKS': [
