@@ -28,6 +28,11 @@ jobs:
           context: ./backend/atd   # where your Dockerfile is
           push: true
           tags: myaccess2021/atd-backend:latest
+      
+      - name: Test Server SSH Port
+        run: |
+          echo "Testing SSH port..."
+          nc -vz -w 15 ${{ secrets.DEPLOY_HOST }} 22
 
       - name: Deploy to Dedicated Server
         uses: appleboy/ssh-action@v1.0.3
