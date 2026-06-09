@@ -80,6 +80,16 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         await self.accept()
         await self.add_connected_client()
 
+        # Send current server epoch time to the connected client
+        current_epoch = int(time.time())
+        await self.send(text_data=json.dumps({
+            "type": 0,
+            "machine": self.client_type,
+            "epoch_time": current_epoch,
+            "message": "connected",
+        }))
+        print(f"[CONNECT] Sent epoch={current_epoch} to client IMEI={self.imei_number} type={self.client_type}")
+
         # If hardware client → update connectivity status
         if self.client_type == 'hardware':
             await self.update_connectivity(self.imei_number, "online")
