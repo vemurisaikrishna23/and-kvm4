@@ -1047,14 +1047,16 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             dispenser_mapping = None
             try:
                 dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(
-                    dispenser_unit=dispenser
+                    dispenser_unit=dispenser,
+                    assigned_status=True
                 )
             except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
                 pass
             if dispenser_mapping is None:
                 try:
                     dispenser_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.get(
-                        dispenser_unit=dispenser
+                        dispenser_unit=dispenser,
+                        assigned_status=True
                     )
                 except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
                     return
