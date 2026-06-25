@@ -2404,6 +2404,76 @@ class GetFuelReadingsLogsWithDispenserGunMappingCustomerID(APIView):
             )
 
 
+class UpdateLivePriceByIMEI(APIView):
+    """
+    TEMPORARY: Update live_price on the active Dispenser_Gun_Mapping_To_Customer
+    for the dispenser identified by IMEI.
+
+    Payload:
+        {
+            "imei_number": "<imei>",
+            "live_price": <float>
+        }
+    """
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        imei_number = request.data.get("imei_number")
+        live_price = request.data.get("live_price")
+
+        if not imei_number:
+            return Response(
+                {"error": "imei_number is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if live_price is None:
+            return Response(
+                {"error": "live_price is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            live_price = float(live_price)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "live_price must be a number"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei_number)
+        except DispenserUnits.DoesNotExist:
+            return Response(
+                {"error": f"Dispenser with IMEI {imei_number} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        mapping = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+            dispenser_unit=dispenser,
+            assigned_status=True,
+        ).first()
+
+        if mapping is None:
+            return Response(
+                {"error": "No active Dispenser_Gun_Mapping_To_Customer found for this dispenser"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        mapping.live_price = live_price
+        mapping.save(update_fields=["live_price"])
+
+        return Response(
+            {
+                "message": "live_price updated successfully",
+                "dispenser_gun_mapping_id": mapping.id,
+                "imei_number": imei_number,
+                "live_price": mapping.live_price,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class GetVehicleSensorDataByMappingID(APIView):
     """
     Returns OBD, GPS, and fuel data for a Dispenser_Gun_Mapping_To_Vehicles record.

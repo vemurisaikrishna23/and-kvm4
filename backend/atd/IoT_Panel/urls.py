@@ -93,6 +93,8 @@ urlpatterns = [
     path("fuel-readings/get/dispenser_gun_mapping_vehicle_id/<int:dispenser_gun_mapping_vehicle_id>/", GetFuelReadingsLogsWithDispenserGunMappingVehicleID.as_view(), name="get-fuel-readings-by-dispenser-gun-mapping-vehicle-id"),
 
     path("vehicle-sensor-data/get/<int:dispenser_vehicle_mapping_id>/", GetVehicleSensorDataByMappingID.as_view(), name="get-vehicle-sensor-data-by-mapping-id"),
+
+    path("dispenser-gun-mapping-to-customer/update-live-price/", UpdateLivePriceByIMEI.as_view(), name="update-live-price-by-imei"),
 ]
 
 
