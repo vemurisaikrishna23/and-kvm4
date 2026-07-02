@@ -247,6 +247,19 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     fuel_level = data.get("fuel_level")
                     if fuel_level is not None:
                         asyncio.create_task(send_to_omnicomm(imei, fuel_level))
+
+                    # Save fuel reading on change (same behaviour as msg_type 31)
+                    fuel_data = ["fuel_level", "fuel_temperature", "fuel_valid"]
+                    fuel_data_exists = all(field in data for field in fuel_data)
+                    if fuel_data_exists and data["fuel_valid"]:
+                        try:
+                            fuel_temperature = float(data["fuel_temperature"])
+                            fuel_level_val = float(data["fuel_level"])
+                            epoch_time = int(data["epoch"]) if data.get("epoch") is not None else int(time.time())
+                        except (ValueError, TypeError) as e:
+                            await self.send_error_message(f"Field type conversion error: {e}")
+                            return
+                        await self.update_fuel_readings(imei, fuel_level_val, fuel_temperature, epoch_time, 4, None)
                 elif msg_type == 51:
                     imei = data.get("imei")
                     price_status = data.get("price_update_status")
@@ -1289,16 +1302,16 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             )
             return
 
-        if msg_type == 31:
+        if msg_type in (31, 4):
             if is_customer:
                 last_reading = FuelSensorReadings.objects.filter(
                     dispenser_customer_mapping=dispenser_mapping,
-                    data_type=31
+                    data_type__in=[31, 4]
                 ).order_by("-epoch_time").first()
             else:
                 last_reading = FuelSensorReadings.objects.filter(
                     dispenser_vehicle_mapping=dispenser_mapping,
-                    data_type=31
+                    data_type__in=[31, 4]
                 ).order_by("-epoch_time").first()
 
             if not last_reading:
@@ -1307,7 +1320,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
                     fuel_level=fuel_level,
                     temperature=fuel_temperature,
-                    data_type=31,
+                    data_type=msg_type,
                     epoch_time=epoch_time
                 )
                 return
@@ -1320,7 +1333,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     dispenser_vehicle_mapping=dispenser_mapping if not is_customer else None,
                     fuel_level=fuel_level,
                     temperature=fuel_temperature,
-                    data_type=31,
+                    data_type=msg_type,
                     epoch_time=epoch_time
                 )
             else:

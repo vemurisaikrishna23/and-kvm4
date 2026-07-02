@@ -429,6 +429,7 @@ class FuelSensorReadings(models.Model):
     DATA_TYPE_CHOICES = [
         (41, "Transaction Data"),
         (31, "30 Sec Auto Push"),
+        (4, "Status Push"),
     ]
     id = models.BigAutoField(primary_key=True)
     dispenser_customer_mapping = models.ForeignKey('Dispenser_Gun_Mapping_To_Customer',on_delete=models.CASCADE,null=True,blank=True,related_name="fuel_sensor_readings_customer")
