@@ -1,6 +1,7 @@
 from re import A
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
+import asyncio
 from asgiref.sync import async_to_sync
 from urllib.parse import parse_qs
 from asgiref.sync import sync_to_async
@@ -44,6 +45,88 @@ def verify_token(token: str, key: str):
         return expected_chk == int(chk), {"imei": imei, "checksum": chk, "timestamp": int(ts)}
     except Exception:
         return False, {}
+
+# ---------- Omnicomm TCP Forwarder ----------
+OMNICOMM_HOST = "cs.omnicomm.in"
+OMNICOMM_PORT = 15349
+
+async def send_to_omnicomm(imei: str, fuel_level):
+    """
+    Forward a fuel-level reading to the Omnicomm CS server over a
+    short-lived TCP connection using the required payload format.
+    """
+    try:
+        try:
+            ain_value = int(round(float(fuel_level) * 10))
+        except (TypeError, ValueError):
+            print(f"[OMNICOMM] Invalid fuel_level={fuel_level!r} for IMEI {imei}; skipping")
+            return
+
+        now_str = datetime.now(timezone("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S")
+
+        payload = [{
+            "t": str(imei),
+            "VD": "ATD",
+            "FV": "TSFWAPP0036_0600",
+            "ak": 0,
+            "AD": 25,
+            "PS": "H",
+            "v": "a",
+            "T": now_str,
+            "l": "+23.027725",
+            "g": "+75.828285",
+            "s": "000.00",
+            "CG": "356.21",
+            "LC": "00A3",
+            "CD": "14687",
+            "IV": "3.9",
+            "SN": "17",
+            "HD": "0.000",
+            "o": "0.000",
+            "MC": "404",
+            "MN": "x10",
+            "MV": "19.4",
+            "DI": "10000",
+            "DO": "00000",
+            "AIN": [ain_value, 0],
+            "F": ain_value,
+            "SID": "1",
+            "SDA": "3e01063a5c060000e8",
+            "ms": "000000",
+            "SS": "31",
+            "is": 0,
+            "i": 0,
+            "p": 1,
+            "FN": "226189",
+            "VM": "S",
+        }]
+
+        data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(OMNICOMM_HOST, OMNICOMM_PORT),
+                timeout=5.0,
+            )
+        except Exception as e:
+            print(f"[OMNICOMM] Connect failed to {OMNICOMM_HOST}:{OMNICOMM_PORT} - {e}")
+            return
+
+        try:
+            writer.write(data)
+            await asyncio.wait_for(writer.drain(), timeout=5.0)
+            print(f"[OMNICOMM] Sent fuel_level={fuel_level} (AIN={ain_value}) for IMEI {imei}")
+        except Exception as e:
+            print(f"[OMNICOMM] Send failed for IMEI {imei} - {e}")
+        finally:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[OMNICOMM] Unexpected error for IMEI {imei}: {e}")
+
 
 # ---------- WebSocket Consumer ----------
 class DispenserControlConsumer(AsyncWebsocketConsumer):
@@ -130,11 +213,10 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 if msg_type == 4:
                     imei = data.get("imei")
                     status = data.get("mstatus")
-
                     if imei is None or status is None:
                         await self.send_error_message("IMEI and status are required")
                         return
-                    
+
                     try:
                         int_status = int(status)
                     except ValueError:
@@ -142,6 +224,10 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         return
                     await self.update_machine_status(imei, status)
                     await self.update_connectivity(imei, "online")
+
+                    fuel_level = data.get("fuel_level")
+                    if fuel_level is not None:
+                        asyncio.create_task(send_to_omnicomm(imei, fuel_level))
                 elif msg_type == 51:
                     imei = data.get("imei")
                     price_status = data.get("price_update_status")
