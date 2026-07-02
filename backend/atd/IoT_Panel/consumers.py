@@ -113,9 +113,28 @@ async def send_to_omnicomm(imei: str, fuel_level):
             return
 
         try:
+            print(f"[OMNICOMM] >>> TCP {OMNICOMM_HOST}:{OMNICOMM_PORT} | IMEI={imei} | fuel_level={fuel_level} | AIN={ain_value}")
+            print(f"[OMNICOMM] >>> PAYLOAD: {data.decode('utf-8')}")
+
             writer.write(data)
             await asyncio.wait_for(writer.drain(), timeout=5.0)
             print(f"[OMNICOMM] Sent fuel_level={fuel_level} (AIN={ain_value}) for IMEI {imei}")
+
+            # ak=1 → expect acknowledgement from server; read whatever it returns
+            try:
+                ack_bytes = await asyncio.wait_for(reader.read(4096), timeout=5.0)
+                if ack_bytes:
+                    try:
+                        ack_text = ack_bytes.decode("utf-8", errors="replace")
+                    except Exception:
+                        ack_text = repr(ack_bytes)
+                    print(f"[OMNICOMM] <<< ACK for IMEI {imei}: {ack_text}")
+                else:
+                    print(f"[OMNICOMM] <<< ACK for IMEI {imei}: <empty / connection closed>")
+            except asyncio.TimeoutError:
+                print(f"[OMNICOMM] <<< ACK timeout for IMEI {imei} (no response in 5s)")
+            except Exception as e:
+                print(f"[OMNICOMM] <<< ACK read error for IMEI {imei} - {e}")
         except Exception as e:
             print(f"[OMNICOMM] Send failed for IMEI {imei} - {e}")
         finally:
