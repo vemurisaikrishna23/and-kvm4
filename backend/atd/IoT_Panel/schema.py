@@ -891,6 +891,74 @@ def annotate_vehicle_sensor_data(views):
 
 
 # ──────────────────────────────────────────────
+#  LIVE PRICE UPDATE (temporary, by IMEI)
+# ──────────────────────────────────────────────
+def annotate_live_price(views):
+    extend_schema_view(
+        post=extend_schema(
+            summary="🆕 TEMP — Update Live Price by IMEI",
+            description=(
+                "> ### ⚠️ Temporary Endpoint (no authentication)\n"
+                "> Updates the `live_price` field on the **active** "
+                "`Dispenser_Gun_Mapping_To_Customer` record for the dispenser "
+                "identified by the given IMEI number.\n\n"
+                "## Behaviour\n"
+                "- Looks up the `DispenserUnits` record by `imei_number`.\n"
+                "- Finds the customer mapping with `assigned_status=True` for that dispenser.\n"
+                "- Updates only the `live_price` field.\n\n"
+                "## Responses\n"
+                "- **200**: `live_price` updated successfully.\n"
+                "- **400**: Missing/invalid `imei_number` or `live_price`.\n"
+                "- **404**: Dispenser with the IMEI not found, or no active customer mapping for it."
+            ),
+            request=inline_serializer(
+                name="UpdateLivePriceByIMEIRequest",
+                fields={
+                    "imei_number": s.CharField(help_text="IMEI number of the dispenser unit"),
+                    "live_price": s.FloatField(help_text="New live price per liter/unit"),
+                },
+            ),
+            examples=[
+                OpenApiExample(
+                    "Request payload",
+                    value={"imei_number": "863674079763296", "live_price": 105.5},
+                    request_only=True,
+                ),
+                OpenApiExample(
+                    "Success",
+                    value={
+                        "message": "live_price updated successfully",
+                        "dispenser_gun_mapping_id": 12,
+                        "imei_number": "863674079763296",
+                        "live_price": 105.5,
+                    },
+                    response_only=True,
+                    status_codes=["200"],
+                ),
+                OpenApiExample(
+                    "Error — dispenser not found",
+                    value={"error": "Dispenser with IMEI 863674079763296 not found"},
+                    response_only=True,
+                    status_codes=["404"],
+                ),
+                OpenApiExample(
+                    "Error — no active mapping",
+                    value={"error": "No active Dispenser_Gun_Mapping_To_Customer found for this dispenser"},
+                    response_only=True,
+                    status_codes=["404"],
+                ),
+                OpenApiExample(
+                    "Error — missing field",
+                    value={"error": "live_price is required"},
+                    response_only=True,
+                    status_codes=["400"],
+                ),
+            ],
+        ),
+    )(views.UpdateLivePriceByIMEI)
+
+
+# ──────────────────────────────────────────────
 #  HELPER: Bind request serializer to POST/PUT/PATCH views that drf-spectacular
 #  can't auto-detect (plain APIViews without serializer_class).
 # ──────────────────────────────────────────────
@@ -1005,3 +1073,4 @@ def apply_all_annotations():
     annotate_order_dispensing(views)
     annotate_fuel_readings(views)
     annotate_vehicle_sensor_data(views)
+    annotate_live_price(views)
