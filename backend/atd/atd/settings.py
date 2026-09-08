@@ -182,7 +182,7 @@ REST_FRAMEWORK = {
 }
 
 _WEBSOCKET_DOCS = """
-API documentation for the ATD IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Orders, and Dashboard.
+API documentation for the AnyTimeDiesel IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Orders, and Dashboard.
 
 ---
 
