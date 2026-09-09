@@ -182,7 +182,7 @@ REST_FRAMEWORK = {
 }
 
 _WEBSOCKET_DOCS = """
-API documentation for the AnyTimeDiesel IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Orders, and Dashboard.
+API documentation for the AnyTimeDiesel IoT Panel — Fuel Dispensing, Dispenser Management, VIN Vehicles, Assets, Orders, and Dashboard.
 
 ---
 
@@ -190,6 +190,25 @@ API documentation for the AnyTimeDiesel IoT Panel — Fuel Dispensing, Dispenser
 
 The dispenser hardware and the web dashboard talk to the backend over a single WebSocket channel.
 This protocol is **not REST** — the endpoints below this section are HTTP. WebSocket messages are documented here for reference.
+
+## Message type index
+
+Every frame carries an integer `type`. This is the whole protocol at a glance.
+
+| Type | Direction | Name | Purpose |
+|---|---|---|---|
+| `0` | ← server | Connection ack | Server epoch time, sent immediately on connect |
+| `4` | → server | Machine status | Status heartbeat, optional fuel-level payload |
+| `11` | → server | Dispense state | Preset state + totalizer starting values |
+| `31` | → server | Auto-push | GPS, fuel level and OBD, roughly every 30 s |
+| `41` | → server | Dispense final | Closing volume, money, GPS and OBD for the transaction |
+| `51` | → server | Price update | Totalizer and live price refresh |
+| `61` | → server | User-tag check | Validate an RFID user tag against the dispenser |
+| `71` | → server | Asset-tag check | Validate asset + user, auto-create a full-tank transaction |
+| `1` | ← server | Start dispense | Command issued after a successful `71` |
+| `6` | ← server | User-tag result | Reply to `61` |
+| `7` | ← server | Asset-tag error | Failure reply to `71` |
+| `99` | ← server | VIN ack | Sent after a VIN-based transaction completes |
 
 ## Connection
 
@@ -203,12 +222,14 @@ ws://<host>/ws/dispenser-control/?imei_number=<IMEI>&token=<TOKEN>&client_type=h
 | `token` | XOR-encoded `<imei>\\|<checksum>\\|<timestamp>` token, base64-encoded |
 | `client_type` | `hardware` (the IoT device) or `web` (the dashboard) |
 
-**Reject codes:**
-- `4001` — Token invalid or IMEI mismatch
-- `4002` — Invalid `client_type`
-- `4003` — IMEI not assigned
+Clients sharing an IMEI join the same channel-layer group (`room_<imei>`), so the
+dashboard and the physical dispenser exchange messages through it.
 
-Every message must include `"type"` (int) and `"machine"` (`"hardware"` or `"web"`).
+> **Close codes.** `4001` — token invalid or IMEI mismatch · `4002` — invalid
+> `client_type` · `4003` — IMEI not assigned.
+
+> **Required fields.** Every message must include `"type"` (int) and `"machine"`
+> (`"hardware"` or `"web"`). Frames missing either are rejected with an error reply.
 
 ---
 

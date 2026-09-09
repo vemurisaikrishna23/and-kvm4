@@ -1,0 +1,266 @@
+{% extends "drf_spectacular/swagger_ui.html" %}
+
+{# Custom Swagger UI skin for the ATD IoT Panel API.                            #}
+{# Extends drf-spectacular's stock template so all of its schema-auth, CSRF and #}
+{# OAuth2 wiring is preserved -- we only append presentation styles.            #}
+
+{% block head %}
+  {{ block.super }}
+  <style>
+    :root {
+      --atd-primary:      #2563eb;
+      --atd-primary-dark: #1e40af;
+      --atd-ink:          #0f172a;
+      --atd-body:         #334155;
+      --atd-muted:        #64748b;
+      --atd-border:       #e2e8f0;
+      --atd-border-soft:  #f1f5f9;
+      --atd-surface:      #ffffff;
+      --atd-canvas:       #eef2f6;
+      --atd-code-bg:      #0f172a;
+      --atd-radius:       12px;
+      --atd-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                  "Liberation Mono", monospace;
+      --atd-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                  "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* ---------- page shell ---------- */
+
+    body { background: var(--atd-canvas); }
+
+    .swagger-ui,
+    .swagger-ui .info li,
+    .swagger-ui .info p,
+    .swagger-ui .info table,
+    .swagger-ui .opblock-tag,
+    .swagger-ui .opblock .opblock-summary-description {
+      font-family: var(--atd-sans);
+    }
+
+    .swagger-ui .wrapper { max-width: 1180px; }
+
+    /* Stock Swagger draws a hard rule under the info block; the card has its
+       own edge, so drop it. */
+    .swagger-ui .information-container { padding: 26px 0 6px; }
+    .swagger-ui .information-container .info { margin: 0; }
+
+    /* ---------- title hero ---------- */
+
+    .swagger-ui .info hgroup.main {
+      margin: 0;
+      padding: 30px 36px 26px;
+      background: linear-gradient(135deg, #0b1220 0%, #172554 55%, #1e3a8a 100%);
+      border-radius: var(--atd-radius) var(--atd-radius) 0 0;
+    }
+
+    .swagger-ui .info hgroup.main .title {
+      color: #ffffff;
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    /* version pill */
+    .swagger-ui .info hgroup.main .title small {
+      background: rgba(255, 255, 255, .14);
+      border: 1px solid rgba(255, 255, 255, .22);
+      border-radius: 999px;
+      vertical-align: middle;
+    }
+    .swagger-ui .info hgroup.main .title small pre.version {
+      color: #dbeafe;
+      font-family: var(--atd-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      padding: 3px 4px;
+    }
+
+    .swagger-ui .info hgroup.main a,
+    .swagger-ui .info hgroup.main .url { color: #93c5fd; }
+
+    /* ---------- description card ---------- */
+
+    .swagger-ui .info .description {
+      background: var(--atd-surface);
+      border: 1px solid var(--atd-border);
+      border-top: 0;
+      border-radius: 0 0 var(--atd-radius) var(--atd-radius);
+      padding: 30px 36px 34px;
+      box-shadow: 0 12px 28px -20px rgba(15, 23, 42, .5);
+      color: var(--atd-body);
+    }
+
+    .swagger-ui .info .description .renderedMarkdown p,
+    .swagger-ui .info .description .renderedMarkdown li {
+      font-size: 14px;
+      line-height: 1.72;
+      color: var(--atd-body);
+    }
+
+    /* ---------- markdown headings ---------- */
+
+    .swagger-ui .info .description h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--atd-ink);
+      margin: 34px 0 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--atd-border);
+    }
+
+    .swagger-ui .info .description h2 {
+      font-size: 17px;
+      font-weight: 650;
+      color: var(--atd-ink);
+      margin: 28px 0 12px;
+      padding-left: 12px;
+      border-left: 3px solid var(--atd-primary);
+      line-height: 1.3;
+    }
+
+    .swagger-ui .info .description h3 {
+      font-size: 14px;
+      font-weight: 650;
+      color: var(--atd-ink);
+      margin: 22px 0 10px;
+    }
+
+    .swagger-ui .info .description hr {
+      border: 0;
+      border-top: 1px solid var(--atd-border);
+      margin: 30px 0;
+    }
+
+    /* ---------- markdown tables ---------- */
+
+    .swagger-ui .info .description table {
+      width: 100%;
+      margin: 18px 0 22px;
+      border: 1px solid var(--atd-border);
+      border-radius: 10px;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    .swagger-ui .info .description thead th {
+      background: #f8fafc;
+      color: var(--atd-ink);
+      font-weight: 650;
+      text-align: left;
+      padding: 11px 15px;
+      border-bottom: 1px solid var(--atd-border);
+      white-space: nowrap;
+    }
+
+    .swagger-ui .info .description tbody td {
+      padding: 10px 15px;
+      border-bottom: 1px solid var(--atd-border-soft);
+      color: var(--atd-body);
+      line-height: 1.6;
+      vertical-align: top;
+    }
+
+    .swagger-ui .info .description tbody tr:last-child td { border-bottom: 0; }
+    .swagger-ui .info .description tbody tr:nth-child(even) { background: #fcfdfe; }
+    .swagger-ui .info .description tbody tr:hover { background: #f5f9ff; }
+
+    /* ---------- code ---------- */
+
+    /* inline code renders as a chip ... */
+    .swagger-ui .info .description code {
+      background: #eef2ff;
+      color: #3730a3;
+      border: 1px solid #e0e7ff;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-family: var(--atd-mono);
+      font-size: 12.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .swagger-ui .info .description pre {
+      background: var(--atd-code-bg);
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin: 14px 0 20px;
+      overflow-x: auto;
+    }
+
+    /* ... but code inside a fenced block must stay flat */
+    .swagger-ui .info .description pre code,
+    .swagger-ui .info .description pre.microlight {
+      background: none;
+      border: 0;
+      padding: 0;
+      color: #e2e8f0;
+      font-family: var(--atd-mono);
+      font-size: 12.5px;
+      font-weight: 400;
+      line-height: 1.65;
+      white-space: pre;
+    }
+
+    /* ---------- blockquote callout ---------- */
+
+    .swagger-ui .info .description blockquote {
+      margin: 18px 0;
+      padding: 12px 18px;
+      background: #eff6ff;
+      border-left: 3px solid var(--atd-primary);
+      border-radius: 0 8px 8px 0;
+    }
+    .swagger-ui .info .description blockquote p { margin: 4px 0; }
+
+    /* ---------- operation list polish ---------- */
+
+    .swagger-ui .scheme-container {
+      background: transparent;
+      box-shadow: none;
+      padding: 22px 0 6px;
+    }
+
+    .swagger-ui .opblock-tag {
+      font-size: 19px;
+      font-weight: 650;
+      color: var(--atd-ink);
+      border-bottom: 1px solid var(--atd-border);
+      padding: 14px 12px;
+    }
+    .swagger-ui .opblock-tag:hover { background: rgba(37, 99, 235, .04); }
+    .swagger-ui .opblock-tag small { color: var(--atd-muted); font-weight: 400; }
+
+    .swagger-ui .opblock {
+      border-radius: 10px;
+      margin: 0 0 10px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+    }
+    .swagger-ui .opblock .opblock-summary { border-radius: 10px; }
+    .swagger-ui .opblock .opblock-summary-method {
+      border-radius: 7px;
+      font-family: var(--atd-sans);
+      font-weight: 650;
+      min-width: 82px;
+    }
+    .swagger-ui .opblock .opblock-summary-path { font-family: var(--atd-mono); font-size: 13px; }
+
+    .swagger-ui .btn { border-radius: 7px; font-family: var(--atd-sans); font-weight: 600; }
+    .swagger-ui select { border-radius: 7px; }
+
+    /* ---------- small screens ---------- */
+
+    @media (max-width: 640px) {
+      .swagger-ui .info hgroup.main { padding: 24px 20px 20px; }
+      .swagger-ui .info hgroup.main .title { font-size: 23px; }
+      .swagger-ui .info .description { padding: 22px 20px 26px; }
+      .swagger-ui .info .description table { display: block; overflow-x: auto; }
+    }
+  </style>
+{% endblock head %}
