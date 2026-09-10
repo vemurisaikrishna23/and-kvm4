@@ -26,6 +26,54 @@ from datetime import datetime
 # --- GLOBAL CONNECTION TRACKER ---
 connected_clients = {}
 
+# --- FUEL SAMPLE VALIDATION ---
+# Omnicomm LLS reports 0x0FFF (4095) as "sensor error / no valid data". It is a
+# status code, not a measurement, so it must never be calibrated or stored --
+# the calibration table maps 4095 to full scale, which turned a failed sensor
+# into a bogus full-tank reading.
+LLS_SENSOR_ERROR_CODE = 4095
+
+# Plausible diesel temperature band. Level and temperature arrive in the same
+# LLS frame, so a temperature outside this range means the frame itself is
+# corrupt and its level bytes cannot be trusted either.
+FUEL_TEMPERATURE_MIN = -20.0
+FUEL_TEMPERATURE_MAX = 60.0
+
+# Calibration tables hold decilitres; divide by this to get litres.
+FUEL_LEVEL_SCALE = 10.0
+
+
+def validate_fuel_sample(raw_adc, fuel_temperature=None, points=None):
+    """
+    Decide whether one raw hardware fuel sample is trustworthy.
+
+    Returns (True, None) when the sample looks real, otherwise
+    (False, "<reason>") so the caller can log why it was dropped.
+    """
+    try:
+        adc = float(raw_adc)
+    except (TypeError, ValueError):
+        return False, f"non-numeric fuel_level {raw_adc!r}"
+
+    if adc >= LLS_SENSOR_ERROR_CODE:
+        return False, f"sensor error code {adc:.0f} (LLS 0x0FFF)"
+
+    if fuel_temperature is not None:
+        try:
+            temp = float(fuel_temperature)
+        except (TypeError, ValueError):
+            return False, f"non-numeric fuel_temperature {fuel_temperature!r}"
+        if not (FUEL_TEMPERATURE_MIN <= temp <= FUEL_TEMPERATURE_MAX):
+            return False, f"implausible temperature {temp}C - corrupt frame"
+
+    if points:
+        low_code = points[0]["code"]
+        high_code = points[-1]["code"]
+        if not (low_code <= adc <= high_code):
+            return False, f"ADC {adc} outside calibration range {low_code}..{high_code}"
+
+    return True, None
+
 # ---------- Token Verification Helpers ----------
 def xor_with_key(data: bytes, key: str) -> bytes:
     key_bytes = key.encode()
@@ -247,7 +295,12 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
                     fuel_level = data.get("fuel_level")
                     if fuel_level is not None:
-                        asyncio.create_task(send_to_omnicomm(imei, fuel_level))
+                        # Never relay a sensor error code or a corrupt frame onward.
+                        ok, why = validate_fuel_sample(fuel_level, data.get("fuel_temperature"))
+                        if ok:
+                            asyncio.create_task(send_to_omnicomm(imei, fuel_level))
+                        else:
+                            print(f"[OMNICOMM SKIP] IMEI {imei}: {why}")
 
                     # Save fuel reading on change (same behaviour as msg_type 31)
                     fuel_data = ["fuel_level", "fuel_temperature", "fuel_valid"]
@@ -1277,19 +1330,33 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         raw_adc = float(fuel_level)
         calibration_config = dispenser_mapping.fuel_level_sensor_configuration
 
+        points = None
         if calibration_config:
             try:
                 if isinstance(calibration_config, str):
-                    import json
                     calibration_config = json.loads(calibration_config)
+                points = sorted(
+                    calibration_config.get("sensor", {}).get("points", []),
+                    key=lambda p: p["code"]
+                ) or None
+            except Exception:
+                calibration_config = None
+                points = None
 
-                calibrated_value = self.convert_adc_to_fuel_level(
+        # Drop sensor error codes and corrupt frames before they reach the
+        # calibration curve -- otherwise a fault reads as a real fuel level.
+        is_valid, reason = validate_fuel_sample(raw_adc, fuel_temperature, points)
+        if not is_valid:
+            print(f"[FUEL REJECT] IMEI {imei} msg_type {msg_type}: {reason}")
+            return
+
+        if calibration_config:
+            try:
+                fuel_level = self.convert_adc_to_fuel_level(
                     raw_adc,
                     calibration_config
                 )
-                fuel_level = calibrated_value
-
-            except Exception as e:
+            except Exception:
                 fuel_level = raw_adc
         else:
             fuel_level = raw_adc
@@ -1349,11 +1416,14 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 return adc_value  
             points = sorted(points, key=lambda x: x["code"])
 
+            # Clamps must apply the same decilitre -> litre scaling as the
+            # interpolated branch below, otherwise a reading at either end of
+            # the curve comes out 10x the value of one just inside it.
             if adc_value <= points[0]["code"]:
-                return points[0]["value"]
+                return round(points[0]["value"] / FUEL_LEVEL_SCALE, 2)
 
             if adc_value >= points[-1]["code"]:
-                return points[-1]["value"]
+                return round(points[-1]["value"] / FUEL_LEVEL_SCALE, 2)
 
             for i in range(len(points) - 1):
                 p1 = points[i]
@@ -1364,7 +1434,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                     x2, y2 = p2["code"], p2["value"]
                     calibrated_value = (y1 + (
                         (adc_value - x1) * (y2 - y1) / (x2 - x1)
-                    ))/10.00
+                    )) / FUEL_LEVEL_SCALE
 
                     return round(calibrated_value, 2)
 
