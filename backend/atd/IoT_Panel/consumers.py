@@ -19,6 +19,7 @@ from pytz import timezone
 import base64, time
 from .models import *
 from existing_tables.models import *
+from django.conf import settings
 from django.utils import timezone as dj_timezone
 from datetime import datetime
 
@@ -847,24 +848,26 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print(f"[ERROR] IMEI {imei} not found in DispenserUnits for machine status update")
 
     @database_sync_to_async
-    def update_price_fields(self, imei, totalizer_reading, amount, live_price):
+    def update_price_fields(self, imei, totalizer_reading, amount, live_price=None):
+        # live_price is only refreshed from the hardware when
+        # settings.UPDATE_LIVE_PRICE_FROM_WEBSOCKET is True. When it is False the
+        # column is left out of the UPDATE entirely, so the existing value stands.
         try:
             dispenser = DispenserUnits.objects.get(imei_number=imei)
+            update_fields = {
+                "live_totalizer_reading": totalizer_reading,
+                "live_total_reading_amount": amount,
+            }
+            if getattr(settings, "UPDATE_LIVE_PRICE_FROM_WEBSOCKET", False):
+                update_fields["live_price"] = live_price
+
             Dispenser_Gun_Mapping_To_Customer.objects.filter(
                 dispenser_unit_id=dispenser.id
-            ).update(
-                live_totalizer_reading=totalizer_reading,
-                live_total_reading_amount=amount,
-                live_price=live_price
-            )
+            ).update(**update_fields)
 
             Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
                 dispenser_unit_id=dispenser.id
-            ).update(
-                live_totalizer_reading=totalizer_reading,
-                live_total_reading_amount=amount,
-                live_price=live_price
-            )
+            ).update(**update_fields)
         except DispenserUnits.DoesNotExist:
             print(f"[ERROR] IMEI {imei} not found for price update")
 

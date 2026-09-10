@@ -94,6 +94,15 @@ ASGI_APPLICATION = 'atd.asgi.application'
 
 MY_SHARED_SECRET_KEY = "atd_shared_secret_key"
 
+# Master switch for live_price writes coming from the dispenser WebSocket.
+#   True  -> msg_type 31 and 51 refresh Dispenser_Gun_Mapping_*.live_price
+#            (the original behaviour)
+#   False -> the hardware never changes live_price; it is set only through
+#            the REST endpoint / mapping serializers
+# Totalizer fields (live_totalizer_reading, live_total_reading_amount) are
+# unaffected either way and always refresh from the hardware.
+UPDATE_LIVE_PRICE_FROM_WEBSOCKET = False
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
