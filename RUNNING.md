@@ -9,20 +9,36 @@ Django 5.2 + DRF + Channels. All commands run from `backend/atd/` unless stated 
 ```bash
 cd backend/atd
 source ../../env/bin/activate
-daphne -b 0.0.0.0 -p 8000 atd.asgi:application
+python manage.py runserver 0.0.0.0:8000
 ```
 
 Or from the repo root, which does all three and prints the URLs:
 
 ```bash
-./run-wsl.sh          # defaults to port 8000
-./run-wsl.sh 8080     # or pick a port
+./run.sh                  # macOS — port 8000, auto-reloads on save
+./run-wsl.sh              # WSL — same
+./run.sh 8080             # or pick a port
+./run.sh --no-reload      # bare daphne, exactly as production runs
 ```
 
-> **Use `daphne`, not `runserver`.** This app serves WebSockets, which need ASGI.
-> `python manage.py runserver` is WSGI-only — HTTP will look fine while every
-> WebSocket silently fails. `WSGI_APPLICATION` is commented out in `settings.py`
-> for exactly this reason.
+### Why `runserver` is the right dev command here
+
+`daphne` is listed **first** in `INSTALLED_APPS`, which replaces Django's
+`runserver` with Daphne's own ASGI version. So `manage.py runserver` in this
+project:
+
+- serves `ASGI_APPLICATION` (`atd.asgi:application`), not WSGI,
+- handles `/ws/` WebSocket connections exactly as bare `daphne` does,
+- **and restarts automatically when you edit a `.py` file.**
+
+Bare `daphne -b 0.0.0.0 -p 8000 atd.asgi:application` has no file watcher, so
+every code change needs a manual Ctrl+C and restart. Use it to reproduce
+production behaviour (it is what the Dockerfile runs) — not for day-to-day work.
+
+> **Never use `runserver` with `daphne` removed from `INSTALLED_APPS`.** Plain
+> Django `runserver` is WSGI-only: HTTP would look fine while every WebSocket
+> silently failed. `WSGI_APPLICATION` is commented out in `settings.py` for
+> exactly this reason.
 
 ---
 
@@ -157,7 +173,8 @@ redis-cli -u redis://:<password>@178.16.137.196:6379/0 ping   # expect PONG
 
 | Symptom | Cause |
 |---|---|
-| WebSockets never connect, HTTP is fine | Started with `runserver` instead of `daphne`, or Redis unreachable |
+| WebSockets never connect, HTTP is fine | Redis unreachable, or `daphne` is no longer first in `INSTALLED_APPS` (which downgrades `runserver` to WSGI) |
+| Code changes do nothing until restart | Started with bare `daphne`, which has no file watcher — use `manage.py runserver` / `./run.sh` |
 | WS closes with `4001` | Token invalid or doesn't match the IMEI |
 | WS closes with `4002` | `client_type` is not `hardware` or `web` |
 | WS closes with `4003` | IMEI not assigned to a dispenser mapping |

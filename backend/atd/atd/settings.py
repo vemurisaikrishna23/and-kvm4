@@ -421,3 +421,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://13.235.49.2:8003",
     "https://13.235.49.2:8003",
 ]
+
+# Pagination metadata is returned in headers so the response body can stay a
+# bare list; browsers hide custom headers from JS unless they are exposed here.
+CORS_EXPOSE_HEADERS = [
+    "X-Total-Count",
+    "X-Total-Pages",
+    "X-Current-Page",
+    "X-Page-Size",
+    "X-Next-Page",
+    "X-Previous-Page",
+]

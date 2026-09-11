@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, serializers
+from rest_framework.pagination import PageNumberPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import *
 from existing_tables.models import *
@@ -17,6 +18,60 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+class FuelDispensingPagination(PageNumberPagination):
+    """25 records per page; override with ?page_size= (capped at 100)."""
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+    def _fix_scheme(self, url):
+        # TLS is terminated at the reverse proxy, so Django sees plain http and
+        # would hand the client an http:// next/previous link on an https site.
+        if not url:
+            return url
+        forwarded_proto = self.request.META.get("HTTP_X_FORWARDED_PROTO")
+        if forwarded_proto:
+            scheme = forwarded_proto.split(",")[0].strip()
+            if scheme and url.startswith("http://") and scheme != "http":
+                return scheme + url[len("http"):]
+        return url
+
+    def get_next_link(self):
+        return self._fix_scheme(super().get_next_link())
+
+    def get_previous_link(self):
+        return self._fix_scheme(super().get_previous_link())
+
+    def get_paginated_response(self, data):
+        # The body stays a bare list so existing clients keep working; the
+        # paging metadata rides along in headers instead.
+        response = Response(data, status=status.HTTP_200_OK)
+        response["X-Total-Count"] = str(self.page.paginator.count)
+        response["X-Total-Pages"] = str(self.page.paginator.num_pages)
+        response["X-Current-Page"] = str(self.page.number)
+        response["X-Page-Size"] = str(self.get_page_size(self.request))
+        next_link = self.get_next_link()
+        previous_link = self.get_previous_link()
+        if next_link:
+            response["X-Next-Page"] = next_link
+        if previous_link:
+            response["X-Previous-Page"] = previous_link
+        return response
+
+
+def is_point_of_contact(user_id, point_of_contact_id):
+    """
+    True when `user_id` appears in a VIN's `point_of_contact_id` list.
+
+    That column is a JSON list of user ids, and entries have been written as
+    both ints and strings over time, so compare on the string form rather than
+    relying on a JSON containment lookup that would miss the other type.
+    """
+    if user_id is None:
+        return False
+    return str(user_id) in [str(poc) for poc in (point_of_contact_id or [])]
+
 
 def get_user_roles(user_id):
     return list(
@@ -1692,9 +1747,11 @@ class GetFuelDispensingRequestsByUserID(APIView):
                 target_poc = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="customer", belong_to_id=poc.belong_to_id).first()
                 if not target_poc:
                     return Response({"error": "This user does not belong to your customer."}, status=status.HTTP_403_FORBIDDEN)
-            requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id).order_by('-request_created_at')
-            serializer = GetFuelDispensingRequestsSerializer(requests, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            requests = RequestFuelDispensingDetails.objects.filter(user_id=user_id).order_by('-request_created_at', '-id')
+            paginator = FuelDispensingPagination()
+            page = paginator.paginate_queryset(requests, request, view=self)
+            serializer = GetFuelDispensingRequestsSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
 
         return Response({"error": "You are not authorized to view fuel dispensing requests."}, status=status.HTTP_403_FORBIDDEN)
 
@@ -1732,10 +1789,8 @@ class GetVINVehicleByVIN(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, vin, format=None):
-        user = request.user
-        user_id = getattr(user, "id", None)
-        roles = get_user_roles(user_id)
-
+        # Reading VIN records is open to every authenticated user: no role
+        # allowlist and no customer / delivery-location scoping.
         vin_vehicle = VIN_Vehicle.objects.filter(vin=vin).order_by('-id').first()
         if not vin_vehicle:
             return Response({"error": "VIN not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1746,24 +1801,6 @@ class GetVINVehicleByVIN(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        poc_ids = vin_vehicle.point_of_contact_id or []
-        if not poc_ids:
-            serializer = GetVINVehicleSerializer(vin_vehicle)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        if 'IOT Admin' in roles:
-            pass
-        elif any(role in roles for role in ['Accounts Admin', 'Dispenser Manager', 'Location Manager', 'Dispenser']):
-            if user_id not in poc_ids:
-                return Response(
-                    {"error": "You are not authorized to access this VIN."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-        else:
-            return Response(
-                {"error": "You are not authorized to access this VIN."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         serializer = GetVINVehicleSerializer(vin_vehicle)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1773,43 +1810,14 @@ class GetVINVehicleByID(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, vin_id, format=None):
-        user = request.user
-        user_id = getattr(user, "id", None)
-        roles = get_user_roles(user_id)
-
+        # Open to every authenticated user - see GetVINVehicleByVIN.
         try:
             vin_vehicle = VIN_Vehicle.objects.get(id=vin_id)
         except VIN_Vehicle.DoesNotExist:
             return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if "IOT Admin" in roles:
-            pass
-
-        elif "Accounts Admin" in roles:
-            try:
-                poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
-            except PointOfContacts.DoesNotExist:
-                return Response({"error": "You are not associated with any customer."},
-                                status=status.HTTP_403_FORBIDDEN)
-            if poc.belong_to_id != vin_vehicle.customer_id:
-                return Response({"error": "You are not authorized to view this VIN vehicle."},
-                                status=status.HTTP_403_FORBIDDEN)
-
-        elif any(role in roles for role in ["Dispenser Manager", "Location Manager", "Dispenser"]):
-            user_pocs = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="delivery_location")
-            if not user_pocs.exists():
-                return Response({"error": "You are not associated with any delivery location."},
-                                status=status.HTTP_403_FORBIDDEN)
-            delivery_location_ids = [poc.belong_to_id for poc in user_pocs]
-            vin_locations = vin_vehicle.delivery_location_id or []
-            if not any(loc_id in vin_locations for loc_id in delivery_location_ids):
-                return Response({"error": "You are not authorized to view this VIN vehicle."},
-                                status=status.HTTP_403_FORBIDDEN)
-        else:
-            return Response({"error": "You are not authorized to view VIN vehicles."},
-                            status=status.HTTP_403_FORBIDDEN)
         serializer = GetVINVehicleSerializer(vin_vehicle)
-        return Response(serializer.data, status=status.HTTP_200_OK)    
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class GetVINVehicleByCustomerID(APIView):
@@ -1817,68 +1825,29 @@ class GetVINVehicleByCustomerID(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, customer_id, format=None):
-        user = request.user
-        user_id = getattr(user, "id", None)
-        roles = get_user_roles(user_id)
+        # Any authenticated user may call this, but the response only ever
+        # contains the VIN records this user is a point of contact for. No role
+        # is exempt, so an admin sees their own VINs and nobody else's.
+        user_id = getattr(request.user, "id", None)
         query_type = request.query_params.get("data", "all").lower()
 
-        if not any(role in roles for role in ['IOT Admin', 'Accounts Admin', 'Dispenser Manager', 'Location Manager']):
-            return Response(
-                {"error": "You are not authorized to access VINs by customer ID."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        vins = [
+            vin
+            for vin in VIN_Vehicle.objects.filter(customer_id=customer_id)
+            if is_point_of_contact(user_id, vin.point_of_contact_id)
+        ]
 
-        vins = VIN_Vehicle.objects.filter(customer_id=customer_id)
-
-        if not vins.exists():
+        if not vins:
             return Response(
-                {"message": f"No VIN records found for customer ID {customer_id}."},
+                {"message": f"No VIN records found for you under customer ID {customer_id}."},
                 status=status.HTTP_404_NOT_FOUND
             )
+
         if query_type == "used":
-            vins = vins.filter(status=True)
+            vins = [vin for vin in vins if vin.status is True]
         elif query_type == "unused":
-            vins = vins.filter(status=False)
+            vins = [vin for vin in vins if vin.status is False]
 
-        if 'Accounts Admin' in roles:
-            try:
-                poc = PointOfContacts.objects.get(user_id=user_id, belong_to_type="customer")
-            except PointOfContacts.DoesNotExist:
-                return Response(
-                    {"error": "You are not associated with any customer."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
-            if poc.belong_to_id != int(customer_id):
-                return Response(
-                    {"error": "You are not authorized to access this customer's VIN data."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
-        elif any(role in roles for role in ['Dispenser Manager', 'Location Manager']):
-            user_pocs = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="delivery_location")
-            if not user_pocs.exists():
-                return Response(
-                    {"error": "You are not associated with any delivery location."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
-            delivery_location_ids = [poc.belong_to_id for poc in user_pocs]
-            vins = vins.filter(
-                Q(delivery_location_id__contains=delivery_location_ids[0]) |
-                Q(delivery_location_id__icontains=str(delivery_location_ids[0]))
-            )
-            if len(delivery_location_ids) > 1:
-                q_filter = Q()
-                for loc_id in delivery_location_ids:
-                    q_filter |= Q(delivery_location_id__contains=loc_id) | Q(delivery_location_id__icontains=str(loc_id))
-                vins = vins.filter(q_filter)
-
-            if not vins.exists():
-                return Response(
-                    {"message": "No VIN records found for your assigned delivery locations."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
         serializer = GetVINVehicleSerializer(vins, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1932,8 +1901,13 @@ class DeleteVINVehicle(APIView):
         except VIN_Vehicle.DoesNotExist:
             return Response({"error": "VIN vehicle not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # DeleteVINVehicleSerializer has no writable fields -- its validate()
+        # holds the delete rules and reads everything from the context. DRF still
+        # refuses to run is_valid() on a serializer built without `data=`, so
+        # pass an empty payload to get the rules to run.
         serializer = DeleteVINVehicleSerializer(
             vin_vehicle,
+            data={},
             context={"user": user, "roles": roles, "vin_vehicle": vin_vehicle},
         )
 

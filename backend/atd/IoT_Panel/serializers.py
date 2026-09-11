@@ -1665,7 +1665,29 @@ class CreateRequestForFuelDispensingSerializer(serializers.Serializer):
         return validated_data
 
 
-class GetFuelDispensingRequestsSerializer(serializers.ModelSerializer):
+# Dispenser status code that means the dispense timed out, so nothing was
+# actually delivered even if the hardware left stale received readings behind.
+DISPENSE_TIMEOUT_STATUS_CODE = 411
+
+
+class DispensedTotalsMixin(serializers.Serializer):
+    """Reports the dispensed volume/price as 0 for timed-out transactions."""
+
+    dispenser_received_volume = serializers.SerializerMethodField()
+    dispenser_received_price = serializers.SerializerMethodField()
+
+    def get_dispenser_received_volume(self, instance):
+        if instance.dispense_status_code == DISPENSE_TIMEOUT_STATUS_CODE:
+            return 0
+        return instance.dispenser_received_volume
+
+    def get_dispenser_received_price(self, instance):
+        if instance.dispense_status_code == DISPENSE_TIMEOUT_STATUS_CODE:
+            return 0
+        return instance.dispenser_received_price
+
+
+class GetFuelDispensingRequestsSerializer(DispensedTotalsMixin, serializers.ModelSerializer):
     DU_Accessible_delivery_locations_details = serializers.SerializerMethodField()
     class Meta:
         model = RequestFuelDispensingDetails
@@ -1690,7 +1712,7 @@ class GetFuelDispensingRequestsSerializer(serializers.ModelSerializer):
         return details
 
 
-class GetFuelDispensingRequestsSerializerWithTransactionLog(serializers.ModelSerializer):
+class GetFuelDispensingRequestsSerializerWithTransactionLog(DispensedTotalsMixin, serializers.ModelSerializer):
     DU_Accessible_delivery_locations_details = serializers.SerializerMethodField()
 
     class Meta:

@@ -604,7 +604,23 @@ def annotate_fuel_dispensing(views):
     extend_schema_view(get=extend_schema(summary="Get Requests by Delivery Location ID", description="Retrieve all fuel dispensing requests for a specific delivery location."))(views.GetFuelDispensingRequestsByDeliveryLocationID)
     extend_schema_view(get=extend_schema(summary="Get Requests by Asset ID", description="Retrieve fuel dispensing requests for a specific asset (vehicle/equipment)."))(views.GetFuelDispensingRequestsByAssetID)
     extend_schema_view(get=extend_schema(summary="Get Request by ID", description="Retrieve a single fuel dispensing request with full transaction log details."))(views.GetFuelDispensingRequestsByID)
-    extend_schema_view(get=extend_schema(summary="Get Requests by User ID", description="Retrieve all fuel dispensing requests created by a specific user."))(views.GetFuelDispensingRequestsByUserID)
+    extend_schema_view(
+        get=extend_schema(
+            summary="Get Requests by User ID",
+            description=(
+                "Retrieve fuel dispensing requests created by a specific user, newest first. "
+                "Paginated at 25 records per page. The response body stays a plain JSON array of "
+                "records; the paging metadata is returned in the `X-Total-Count`, `X-Total-Pages`, "
+                "`X-Current-Page`, `X-Page-Size`, `X-Next-Page` and `X-Previous-Page` response headers. "
+                "Transactions that timed out (`dispense_status_code` 411) report "
+                "`dispenser_received_volume` and `dispenser_received_price` as 0."
+            ),
+            parameters=[
+                OpenApiParameter(name="page", type=int, location=OpenApiParameter.QUERY, required=False, description="Page number (default 1)"),
+                OpenApiParameter(name="page_size", type=int, location=OpenApiParameter.QUERY, required=False, description="Records per page (default 25, max 100)"),
+            ],
+        ),
+    )(views.GetFuelDispensingRequestsByUserID)
 
 
 # ──────────────────────────────────────────────
