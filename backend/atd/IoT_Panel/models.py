@@ -87,6 +87,15 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
         (0, 'None'),
         (1, 'Capacitive')
     ]
+
+    # Reported by the hardware through msg_type 4's optional `gstatus` field.
+    # The key being absent is meaningful in itself: the dispenser is not telling
+    # us anything about its gun, so we must not claim it is either up or down.
+    Gun_Status = [
+        ('unavailable', 'Unavailable'),
+        ('online', 'Online'),
+        ('offline', 'Offline'),
+    ]
     id = models.BigAutoField(primary_key=True)
     dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE)
     gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE,blank=True, null=True)
@@ -103,6 +112,7 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
     status = models.BooleanField(default=True, help_text="to stop controls to the customer")
     machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
     connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
+    gun_status = models.CharField(max_length=12, choices=Gun_Status, default='unavailable', help_text="Gun reachability from msg_type 4 `gstatus`: active -> online, inactive -> offline, key absent -> unavailable")
     installation_mode = models.IntegerField(default=0, choices=Installation_Mode, help_text="Installation Mode")
     fuel_level_sensor = models.BooleanField(default=False, help_text="Whether the tank is installed with fuel level sensor or not")
     fuel_level_sensor_type = models.IntegerField(default=0, choices=Fuel_Level_Sensor_Type, help_text="Fuel Level Sensor Type")

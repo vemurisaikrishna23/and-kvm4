@@ -246,9 +246,22 @@ dashboard and the physical dispenser exchange messages through it.
 
 ### `type: 4` — Machine Status Update
 ```json
-{ "type": 4, "machine": "hardware", "imei": "...", "mstatus": 1 }
+{ "type": 4, "machine": "hardware", "imei": "...", "mstatus": 1, "gstatus": "active" }
 ```
 Updates `Dispenser_Gun_Mapping_*.machine_status` (1=Idle, 0=Offline, 2=Dispensing, 3=Allocated, 4=Error).
+
+`gstatus` is **optional** and drives `Dispenser_Gun_Mapping_To_Customer.gun_status`:
+
+| `gstatus` in the frame | Stored `gun_status` |
+|---|---|
+| `"active"` | `online` |
+| `"inactive"` | `offline` |
+| key absent, or `null` | `unavailable` |
+
+Omitting the key is not the same as reporting a down gun — it means the
+dispenser said nothing about it, so the column reads `unavailable` rather than
+`offline`. Numeric and boolean spellings (`1`/`0`, `true`/`false`) are accepted
+for the two live states; anything else is logged and stored as `unavailable`.
 
 ### `type: 51` — Price Update
 ```json

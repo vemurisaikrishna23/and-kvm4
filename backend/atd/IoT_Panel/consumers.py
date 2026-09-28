@@ -43,6 +43,47 @@ FUEL_TEMPERATURE_MAX = 60.0
 FUEL_LEVEL_SCALE = 10.0
 
 
+# --- GUN STATUS (msg_type 4 `gstatus`) ---
+# `gstatus` is optional. Its absence is information in its own right: the
+# dispenser is reporting nothing about its gun, which is not the same as the gun
+# being down, so it maps to "unavailable" rather than "offline".
+GUN_STATUS_UNAVAILABLE = "unavailable"
+GUN_STATUS_ONLINE = "online"
+GUN_STATUS_OFFLINE = "offline"
+
+_GUN_STATUS_ONLINE_VALUES = {"active", "online", "1", "true"}
+_GUN_STATUS_OFFLINE_VALUES = {"inactive", "offline", "0", "false"}
+
+
+def resolve_gun_status(payload: dict) -> str:
+    """
+    Map msg_type 4's optional `gstatus` onto Dispenser_Gun_Mapping_To_Customer.gun_status.
+
+        key absent / null  -> "unavailable"
+        "active"           -> "online"
+        "inactive"         -> "offline"
+
+    Numeric and boolean spellings of the same two states are accepted because
+    firmware sends `mstatus` as an int; anything else is logged and treated as
+    unavailable so a protocol change is visible instead of silently wrong.
+    """
+    if "gstatus" not in payload:
+        return GUN_STATUS_UNAVAILABLE
+
+    raw = payload.get("gstatus")
+    if raw is None:
+        return GUN_STATUS_UNAVAILABLE
+
+    value = str(raw).strip().lower()
+    if value in _GUN_STATUS_ONLINE_VALUES:
+        return GUN_STATUS_ONLINE
+    if value in _GUN_STATUS_OFFLINE_VALUES:
+        return GUN_STATUS_OFFLINE
+
+    print(f"[GUN STATUS] Unrecognised gstatus={raw!r}; recording as {GUN_STATUS_UNAVAILABLE}")
+    return GUN_STATUS_UNAVAILABLE
+
+
 def validate_fuel_sample(raw_adc, fuel_temperature=None, points=None):
     """
     Decide whether one raw hardware fuel sample is trustworthy.
@@ -292,6 +333,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         return
                     await self.update_machine_status(imei, status)
                     await self.update_connectivity(imei, "online")
+                    await self.update_gun_status(imei, resolve_gun_status(data))
 
                     fuel_level = data.get("fuel_level")
                     if fuel_level is not None:
@@ -886,6 +928,17 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
 
 
+
+    @database_sync_to_async
+    def update_gun_status(self, imei: str, gun_status: str):
+        try:
+            dispenser = DispenserUnits.objects.get(imei_number=imei)
+        except DispenserUnits.DoesNotExist:
+            print(f"[ERROR] IMEI {imei} not found in DispenserUnits for gun status update")
+            return
+        Dispenser_Gun_Mapping_To_Customer.objects.filter(
+            dispenser_unit_id=dispenser.id
+        ).update(gun_status=gun_status)
 
     @database_sync_to_async
     def update_machine_status(self, imei: str, status: str):
