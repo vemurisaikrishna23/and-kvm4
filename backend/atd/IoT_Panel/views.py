@@ -60,6 +60,44 @@ class FuelDispensingPagination(PageNumberPagination):
         return response
 
 
+def is_customer_point_of_contact(user_id, customer_id):
+    """
+    True when the user is a point of contact tied to this customer, by *any* POC
+    type and regardless of the roles they hold.
+
+    `customer` POCs match on belong_to_id directly. `delivery_location` POCs
+    match when the location they are attached to belongs to that customer.
+    """
+    if user_id is None:
+        return False
+
+    try:
+        customer_id = int(customer_id)
+    except (TypeError, ValueError):
+        return False
+
+    pocs = list(
+        PointOfContacts.objects.filter(user_id=user_id)
+        .values_list("belong_to_type", "belong_to_id")
+    )
+    if not pocs:
+        return False
+
+    location_ids = []
+    for belong_to_type, belong_to_id in pocs:
+        if belong_to_type == "customer" and belong_to_id == customer_id:
+            return True
+        if belong_to_type == "delivery_location":
+            location_ids.append(belong_to_id)
+
+    if location_ids:
+        return DeliveryLocations.objects.filter(
+            id__in=location_ids, customer_id=customer_id
+        ).exists()
+
+    return False
+
+
 def is_point_of_contact(user_id, point_of_contact_id):
     """
     True when `user_id` appears in a VIN's `point_of_contact_id` list.
@@ -521,39 +559,23 @@ class GetDispenserGunMappingToCustomerByCustomerID(APIView):
         user = request.user
         user_id = getattr(user, "id", None)
         roles = get_user_roles(user_id)
-        if any(role in roles for role in ['IOT Admin', 'Accounts Admin']):
-            if "Accounts Admin" in roles:
-                try:
-                    poc = PointOfContacts.objects.filter(
-                        user_id=user_id,
-                        belong_to_type='customer',
-                        belong_to_id=customer_id
-                    ).first()
-                    
-                    if not poc:
-                        return Response({
-                            "error": "You are not authorized to access this customer's data"
-                        }, status=status.HTTP_403_FORBIDDEN)
-                    
-                    dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(
-                        customer=customer_id,
-                        assigned_status=True
-                    )
-                except Exception as e:
-                    return Response({
-                        "error": f"Error retrieving customer data: {str(e)}"
-                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            else:
-                dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(
-                    customer=customer_id,
-                    assigned_status=True
-                )
-            
-            serializer = GetDispenserGunMappingToCustomerSerializer(dispenser_gun_mapping_to_customer, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "You are not authorized to get dispenser gun mapping to customer"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Access is by point-of-contact association, not by role: every POC type
+        # qualifies (customer and delivery_location alike) and no role is
+        # required. IOT Admin keeps the blanket access it has elsewhere.
+        if "IOT Admin" not in roles and not is_customer_point_of_contact(user_id, customer_id):
+            return Response(
+                {"error": "You are not a point of contact for this customer."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        dispenser_gun_mapping_to_customer = Dispenser_Gun_Mapping_To_Customer.objects.filter(
+            customer=customer_id,
+            assigned_status=True
+        )
+
+        serializer = GetDispenserGunMappingToCustomerSerializer(dispenser_gun_mapping_to_customer, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class EditDispenserGunMappingToCustomer(APIView):
     renderer_classes = [IoT_PanelRenderer]
