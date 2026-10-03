@@ -11,6 +11,8 @@ import hashlib
 from django.db.models import Q, Sum, Count
 import time
 from datetime import datetime, timedelta
+from django.db import transaction
+from .camera_serializers import validate_camera_block, apply_camera_block
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -522,10 +524,14 @@ class AddDispenserGunMappingToCustomer(APIView):
         roles = get_user_roles(user_id)
         
         if "IOT Admin" in roles:
+            camera_block = validate_camera_block(request.data.get("camera"))
             serializer = CreateDispenserGunMappingToCustomerSerializer(data=request.data, context={"user": user})
             if serializer.is_valid(raise_exception=True):
                 try:
-                    serializer.save()
+                    with transaction.atomic():
+                        instance = serializer.save()
+                        if camera_block is not None:
+                            transaction.on_commit(apply_camera_block(instance.dispenser_unit_id, camera_block, user))
                     return Response({
                         "message": "Dispenser & Gun Unit Mapping to Customer Created Successfully",
                     }, status=status.HTTP_201_CREATED)
@@ -592,10 +598,14 @@ class EditDispenserGunMappingToCustomer(APIView):
             except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
                 return Response({'error': 'Dispenser Gun Mapping with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
             
+            camera_block = validate_camera_block(request.data.get("camera"))
             serializer = EditDispenserGunMappingToCustomerSerializer(instance, data=request.data, partial=True, context={"user": user})
             if serializer.is_valid(raise_exception=True):
                 try:
-                    serializer.save()
+                    with transaction.atomic():
+                        instance = serializer.save()
+                        if camera_block is not None:
+                            transaction.on_commit(apply_camera_block(instance.dispenser_unit_id, camera_block, user))
                     return Response({
                         "message": "Dispenser Gun Mapping to Customer Updated Successfully",
                     }, status=status.HTTP_200_OK)
@@ -1954,10 +1964,14 @@ class AddDispenserGunMappingToVehicles(APIView):
         roles = get_user_roles(user_id)
         
         if "IOT Admin" in roles:
+            camera_block = validate_camera_block(request.data.get("camera"))
             serializer = CreateDispenserGunMappingToVehiclesSerializer(data=request.data, context={"user": user})
             if serializer.is_valid(raise_exception=True):
                 try:
-                    serializer.save()
+                    with transaction.atomic():
+                        instance = serializer.save()
+                        if camera_block is not None:
+                            transaction.on_commit(apply_camera_block(instance.dispenser_unit_id, camera_block, user))
                     return Response({
                         "message": "Dispenser & Gun Unit Mapping to Vehicles Created Successfully",
                     }, status=status.HTTP_201_CREATED)
@@ -2073,10 +2087,14 @@ class EditDispenserGunMappingToVehicles(APIView):
             except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
                 return Response({'error': 'Dispenser Gun Mapping To Vehicles with this ID not found'}, status=status.HTTP_404_NOT_FOUND)
             
+            camera_block = validate_camera_block(request.data.get("camera"))
             serializer = EditDispenserGunMappingToVehiclesSerializer(instance, data=request.data, partial=True, context={"user": user})
             if serializer.is_valid(raise_exception=True):
                 try:
-                    serializer.save()
+                    with transaction.atomic():
+                        instance = serializer.save()
+                        if camera_block is not None:
+                            transaction.on_commit(apply_camera_block(instance.dispenser_unit_id, camera_block, user))
                     return Response({
                         "message": "Dispenser Gun Mapping to Vehicles Updated Successfully",
                     }, status=status.HTTP_200_OK)

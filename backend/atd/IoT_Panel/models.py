@@ -243,6 +243,8 @@ class RequestFuelDispensingDetails(models.Model):
     dispense_time_taken = models.FloatField(blank=True, null=True, help_text="Fuel Dispense Time Taken in seconds")
     dispense_status_code = models.IntegerField(default=0,help_text="Fuel Dispenser Status Code")
     remarks = models.CharField(max_length=255, blank=True, null=True, help_text="Remarks")
+    latest_snapshot_path = models.CharField(max_length=500, blank=True, null=True, help_text="Static media path of the newest camera snapshot, e.g. /media/camera_snapshots/...jpg")
+    snapshot_count = models.IntegerField(default=0, help_text="Number of camera snapshots saved for this request")
     request_created_at = models.DateTimeField(blank=True, null=True)
     request_updated_at = models.DateTimeField(blank=True, null=True)
     request_created_by = models.PositiveBigIntegerField(blank=True, null=True)
@@ -477,3 +479,129 @@ class VehicleOBDAndGPSReadings(models.Model):
         verbose_name = "Vehicle OBD & GPS Reading"
         verbose_name_plural = "Vehicle OBD & GPS Readings"
 
+
+
+# ----------------------------------------------------------------------
+# Camera management (on-demand RTMP cameras on MediaMTX)
+# Design: ATD_Server/CAMERA_MANAGEMENT_DESIGN.md
+# ----------------------------------------------------------------------
+
+class Camera(models.Model):
+    Stream_Mode = [
+        (0, 'On Demand'),
+        (1, 'Always On'),
+        (2, 'Disabled'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE, related_name="cameras", help_text="Dispenser unit the camera is installed on")
+    serial_number = models.CharField(max_length=100, unique=True, help_text="Camera serial number")
+    model_number = models.CharField(max_length=100, help_text="Camera model number")
+    brand = models.CharField(max_length=100, blank=True, null=True, help_text="Camera brand")
+    rtmp_path = models.CharField(max_length=150, unique=True, help_text="MediaMTX path the camera publishes to, e.g. rtmp_push/D001")
+    webrtc_url = models.CharField(max_length=255, help_text="WebRTC page URL, e.g. https://cam.myaccess.cloud/rtmp_push/D001/")
+    stream_mode = models.IntegerField(default=0, choices=Stream_Mode, help_text="On Demand: enabled only while a session needs it")
+    is_active = models.BooleanField(default=True, help_text="Inactive cameras are never enabled")
+    remarks = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.PositiveBigIntegerField(blank=True, null=True)
+    updated_by = models.PositiveBigIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "cameras"
+        verbose_name = "Camera"
+        verbose_name_plural = "Cameras"
+
+
+class CameraStreamSession(models.Model):
+    Reason = [
+        ('live_view', 'Live View'),
+        ('fuel_request', 'Fuel Request'),
+        ('manual', 'Manual'),
+    ]
+
+    End_Reason = [
+        ('closed', 'Closed'),
+        ('timeout', 'Timeout'),
+        ('request_completed', 'Request Completed'),
+        ('request_interrupted', 'Request Interrupted'),
+        ('request_failed', 'Request Failed'),
+        ('manual_disable', 'Manual Disable'),
+        ('camera_deleted', 'Camera Deleted'),
+        ('camera_edited', 'Camera Edited'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    camera = models.ForeignKey('Camera', on_delete=models.CASCADE, related_name="sessions")
+    reason = models.CharField(max_length=20, choices=Reason)
+    user_id = models.BigIntegerField(blank=True, null=True, help_text="User who opened the session")
+    request = models.ForeignKey('RequestFuelDispensingDetails', on_delete=models.SET_NULL, blank=True, null=True, related_name="camera_sessions")
+    order_request = models.ForeignKey('OrderFuelDispensingDetails', on_delete=models.SET_NULL, blank=True, null=True, related_name="camera_sessions")
+    dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.SET_NULL, blank=True, null=True, related_name="camera_sessions")
+    transaction_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    started_at = models.DateTimeField()
+    expires_at = models.DateTimeField(db_index=True)
+    last_heartbeat_at = models.DateTimeField(blank=True, null=True)
+    ended_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    end_reason = models.CharField(max_length=30, choices=End_Reason, blank=True, null=True)
+
+    class Meta:
+        db_table = "camera_stream_sessions"
+        verbose_name = "Camera Stream Session"
+        verbose_name_plural = "Camera Stream Sessions"
+
+
+class CameraEvent(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    camera = models.ForeignKey('Camera', on_delete=models.SET_NULL, blank=True, null=True, related_name="events")
+    event = models.CharField(max_length=40, db_index=True)
+    details = models.JSONField(blank=True, null=True)
+    user_id = models.BigIntegerField(blank=True, null=True)
+    created_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        db_table = "camera_events"
+        verbose_name = "Camera Event"
+        verbose_name_plural = "Camera Events"
+
+
+class RequestCameraSnapshot(models.Model):
+    Kind = [
+        ('periodic', 'Periodic'),
+        ('stage', 'Stage'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    request = models.ForeignKey('RequestFuelDispensingDetails', on_delete=models.CASCADE, blank=True, null=True, related_name="camera_snapshots")
+    order_request = models.ForeignKey('OrderFuelDispensingDetails', on_delete=models.CASCADE, blank=True, null=True, related_name="camera_snapshots")
+    transaction_id = models.CharField(max_length=255, db_index=True)
+    dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.SET_NULL, blank=True, null=True, related_name="camera_snapshots")
+    camera = models.ForeignKey('Camera', on_delete=models.SET_NULL, blank=True, null=True, related_name="snapshots")
+    session = models.ForeignKey('CameraStreamSession', on_delete=models.SET_NULL, blank=True, null=True, related_name="snapshots")
+    # Dispenser data copied at capture time so history stays correct after reassignment
+    dispenser_serialnumber = models.CharField(max_length=255, blank=True, null=True)
+    dispenser_imeinumber = models.CharField(max_length=255, blank=True, null=True)
+    dispenser_gun_mapping_id = models.BigIntegerField(blank=True, null=True)
+    request_status = models.IntegerField(blank=True, null=True, help_text="Request status at capture (0 Pending ... 5 Failed)")
+    dispense_status_code = models.IntegerField(blank=True, null=True, help_text="Raw hardware status code at capture")
+    dispensed_volume = models.FloatField(blank=True, null=True)
+    dispensed_amount = models.FloatField(blank=True, null=True)
+    gps_coordinates = models.JSONField(blank=True, null=True)
+    kind = models.CharField(max_length=10, choices=Kind, default='periodic')
+    image_path = models.CharField(max_length=500, help_text="Static media path, e.g. /media/camera_snapshots/2026/10/03/<txn>/<uuid>.jpg")
+    width = models.IntegerField(blank=True, null=True)
+    height = models.IntegerField(blank=True, null=True)
+    size_bytes = models.IntegerField(blank=True, null=True)
+    captured_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "request_camera_snapshots"
+        verbose_name = "Request Camera Snapshot"
+        verbose_name_plural = "Request Camera Snapshots"
+        indexes = [
+            models.Index(fields=["request", "captured_at"], name="rcs_request_captured_idx"),
+            models.Index(fields=["transaction_id", "captured_at"], name="rcs_txn_captured_idx"),
+            models.Index(fields=["dispenser_unit", "captured_at"], name="rcs_dispenser_captured_idx"),
+        ]

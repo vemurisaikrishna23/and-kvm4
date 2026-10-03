@@ -176,6 +176,26 @@ STORAGES = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+
+# Camera management (MediaMTX on-demand RTMP cameras).
+# All values can be overridden with environment variables of the same name.
+MEDIAMTX_API_URL = os.environ.get("MEDIAMTX_API_URL", "http://72.60.221.158:9997")
+MEDIAMTX_API_USER = os.environ.get("MEDIAMTX_API_USER", "admin")
+MEDIAMTX_API_PASS = os.environ.get("MEDIAMTX_API_PASS", "")
+MEDIAMTX_API_TIMEOUT_S = float(os.environ.get("MEDIAMTX_API_TIMEOUT_S", "5"))
+MEDIAMTX_RTSP_BASE = os.environ.get("MEDIAMTX_RTSP_BASE", "rtsp://72.60.221.158:8554")
+CAMERA_PUBLIC_RTMP_BASE = os.environ.get("CAMERA_PUBLIC_RTMP_BASE", "rtmp://cam.myaccess.cloud")
+CAMERA_PUBLIC_WEBRTC_BASE = os.environ.get("CAMERA_PUBLIC_WEBRTC_BASE", "https://cam.myaccess.cloud")
+CAMERA_LIVE_TTL_S = int(os.environ.get("CAMERA_LIVE_TTL_S", "60"))
+CAMERA_FUEL_REQUEST_START_TTL_S = int(os.environ.get("CAMERA_FUEL_REQUEST_START_TTL_S", "300"))
+CAMERA_FUEL_REQUEST_TTL_S = int(os.environ.get("CAMERA_FUEL_REQUEST_TTL_S", "1800"))
+CAMERA_FINAL_GRACE_S = int(os.environ.get("CAMERA_FINAL_GRACE_S", "5"))
+CAMERA_RECONCILE_INTERVAL_S = int(os.environ.get("CAMERA_RECONCILE_INTERVAL_S", "15"))
+CAMERA_SNAPSHOT_INTERVAL_S = int(os.environ.get("CAMERA_SNAPSHOT_INTERVAL_S", "10"))
+CAMERA_SNAPSHOT_WIDTH = int(os.environ.get("CAMERA_SNAPSHOT_WIDTH", "1280"))
+CAMERA_SNAPSHOT_RETENTION_DAYS = int(os.environ.get("CAMERA_SNAPSHOT_RETENTION_DAYS", "0"))  # 0 = keep all snapshots forever
+CAMERA_SNAPSHOT_DIR = os.environ.get("CAMERA_SNAPSHOT_DIR", "camera_snapshots")  # under MEDIA_ROOT
+FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

@@ -41,7 +41,24 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
-            docker pull myaccess2021/atd-backend:latest
+            set -e
+            IMAGE=myaccess2021/atd-backend:latest
+            # Env file + media folder live on the server (camera feature):
+            #   /root/projects/atd-backend/atd-backend.env   (MEDIAMTX_API_PASS etc., chmod 600)
+            #   /root/projects/atd-backend/media             (camera snapshots, survives redeploys)
+            APP_DIR=/root/projects/atd-backend
+            ENV_FILE=$APP_DIR/atd-backend.env
+            mkdir -p $APP_DIR/media
+            [ -f $ENV_FILE ] || touch $ENV_FILE
+
+            docker pull $IMAGE
+
+            # 1) Migrations first, with the NEW image, while the old container still serves.
+            #    New migrations only add tables/columns, so the old code keeps working meanwhile.
+            #    If this fails the deploy stops here and the old containers keep running.
+            docker run --rm --env-file $ENV_FILE $IMAGE python manage.py migrate --noinput
+
+            # 2) Replace the API container
             docker stop atd-backend || true
             docker rm -f atd-backend || true
             sleep 2
@@ -53,8 +70,21 @@ jobs:
             fi
             docker run -d \
               --name atd-backend \
+              --restart unless-stopped \
+              --env-file $ENV_FILE \
+              -v $APP_DIR/media:/app/media \
               -p 8003:8000 \
-              myaccess2021/atd-backend:latest
+              $IMAGE
+
+            # 3) Replace the camera worker (same image; exactly one instance)
+            docker stop atd-camera-worker || true
+            docker rm -f atd-camera-worker || true
+            docker run -d \
+              --name atd-camera-worker \
+              --restart unless-stopped \
+              --env-file $ENV_FILE \
+              -v $APP_DIR/media:/app/media \
+              $IMAGE python manage.py camera_worker
           # script: |
           #   docker pull myaccess2021/atd-backend:latest
           #   docker stop atd-backend || true

@@ -15,7 +15,9 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     pkg-config \
     gcc \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+# ffmpeg: used by `python manage.py camera_worker` for fuel-request camera snapshots
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

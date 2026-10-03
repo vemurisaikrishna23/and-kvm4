@@ -519,11 +519,17 @@ class GetDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
     dispenser_unit = GetDispenserUnitsSerializer()
     gun_unit = GetGunUnitsSerializer()
     last_fuel_reading = serializers.SerializerMethodField()
+    camera = serializers.SerializerMethodField()
 
     class Meta:
         model = Dispenser_Gun_Mapping_To_Customer
         fields = '__all__'
         depth = 1
+
+    def get_camera(self, obj):
+        # Primary camera of the dispenser (None if no camera); see camera_serializers.camera_summary
+        from .camera_serializers import camera_summary
+        return camera_summary(obj.dispenser_unit_id)
 
     def get_last_fuel_reading(self, obj):
         last = FuelSensorReadings.objects.filter(
@@ -2224,11 +2230,17 @@ class GetDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     dispenser_unit = GetDispenserUnitsSerializer()
     gun_unit = GetGunUnitsSerializer()
     last_fuel_reading = serializers.SerializerMethodField()
+    camera = serializers.SerializerMethodField()
 
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
         fields = '__all__'
         depth = 1
+
+    def get_camera(self, obj):
+        # Primary camera of the dispenser (None if no camera); see camera_serializers.camera_summary
+        from .camera_serializers import camera_summary
+        return camera_summary(obj.dispenser_unit_id)
 
     def get_last_fuel_reading(self, obj):
         last = FuelSensorReadings.objects.filter(

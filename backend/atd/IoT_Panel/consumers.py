@@ -21,6 +21,8 @@ from .models import *
 from existing_tables.models import *
 from django.conf import settings
 from django.utils import timezone as dj_timezone
+from django.db import close_old_connections
+from . import camera_service
 from datetime import datetime
 
 # --- GLOBAL CONNECTION TRACKER ---
@@ -779,6 +781,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                             f"[ASSET-USER POC] TXN row created id={create_result['row_id']} "
                             f"TXN={resolved['transaction_id']}"
                         )
+                    # Camera: dispensing was started (type 1 sent above) → enable camera
+                    self.camera_hook(camera_service.on_fuel_request_started, imei, resolved["transaction_id"])
 
 
 
@@ -848,6 +852,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         print(f"[PRESET LOG] Updated for TXN={transaction_id} IMEI={imei}")
                 else:
                     pass
+            elif machine == "web" and msg_type == 1:
+                # Camera: start-dispense command from the web/app → enable camera
+                self.camera_hook(camera_service.on_fuel_request_started, data.get("imei"), data.get("transaction_id"))
             await self.channel_layer.group_send(
                 self.room_id,
                 {
@@ -895,6 +902,24 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
     async def send_data(self, data):
         await self.send(text_data=json.dumps(data))
+
+    def camera_hook(self, fn, *args):
+        """Run a camera hook in the background so the websocket never waits on it.
+        thread_sensitive=False keeps a slow MediaMTX call off the shared DB thread."""
+        def run_sync():
+            close_old_connections()
+            try:
+                fn(*args)
+            finally:
+                close_old_connections()
+
+        async def run():
+            try:
+                await sync_to_async(run_sync, thread_sensitive=False)()
+            except Exception as e:
+                print(f"[CAMERA HOOK] {getattr(fn, '__name__', fn)} failed: {e}")
+
+        asyncio.create_task(run())
 
     @sync_to_async
     def verify_token_and_match_imei(self, token: str, given_imei: str) -> bool:
@@ -1569,6 +1594,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         txn.request_status = request_status
         txn.dispense_status_code = status_code
         txn.save(update_fields=["request_status", "dispense_status_code"])
+        # Camera: extend the session while dispensing, end it (after a short grace) on a final status.
+        # DB-only and never raises, so it is safe inline here.
+        camera_service.on_fuel_request_status(transaction_id, request_status)
         return {"success": True,"request_status": request_status}
 
     @sync_to_async

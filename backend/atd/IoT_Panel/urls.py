@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from .views import *
 
 urlpatterns = [
@@ -95,6 +95,9 @@ urlpatterns = [
     path("vehicle-sensor-data/get/<int:dispenser_vehicle_mapping_id>/", GetVehicleSensorDataByMappingID.as_view(), name="get-vehicle-sensor-data-by-mapping-id"),
 
     path("dispenser-gun-mapping-to-customer/update-live-price/", UpdateLivePriceByIMEI.as_view(), name="update-live-price-by-imei"),
+
+    # Camera management, live view and request snapshots
+    path("", include("IoT_Panel.camera_urls")),
 ]
 
 
