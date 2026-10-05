@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from existing_tables.models import PointOfContacts
-from . import camera_service, mediamtx
+from . import camera_service, mediamtx, mediamtx_logs
 from .camera_serializers import (
     CameraEventSerializer,
     CameraSerializer,
@@ -23,7 +23,7 @@ from .camera_serializers import (
     current_assignment,
 )
 from .mediamtx import MediaMTXError
-from .models import Camera, CameraEvent, CameraStreamSession, RequestCameraSnapshot, RequestFuelDispensingDetails
+from .models import Camera, CameraEvent, CameraStreamSession, DispenserUnits, RequestCameraSnapshot, RequestFuelDispensingDetails
 from .renderers import IoT_PanelRenderer
 from .views import FuelDispensingPagination, get_user_roles, is_customer_point_of_contact
 
@@ -147,15 +147,27 @@ class GetCamerasByDispenser(APIView):
     def get(self, request, dispenser_unit_id, format=None):
         user_id, roles = _user(request)
         cameras = list(Camera.objects.select_related("dispenser_unit").filter(dispenser_unit_id=dispenser_unit_id).order_by("id"))
-        if cameras and not can_view_camera(user_id, roles, cameras[0]):
-            return _forbidden()
-        if not cameras and IOT_ADMIN not in roles:
+        if not cameras:
+            return Response([], status=status.HTTP_200_OK)
+        if not can_view_camera(user_id, roles, cameras[0]):
             return _forbidden()
         data = CameraSerializer(cameras, many=True).data
         if request.query_params.get("live", "false") == "true":
             data = _with_live(list(data), cameras)
         return Response(data, status=status.HTTP_200_OK)
 
+
+
+class GetCamerasByDispenserIMEI(APIView):
+    """Cameras of the dispenser with this IMEI (request screens only know the IMEI)."""
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, imei, format=None):
+        du = DispenserUnits.objects.filter(imei_number=str(imei)).first()
+        if du is None:
+            return Response([], status=status.HTTP_200_OK)
+        return GetCamerasByDispenser().get(request, du.id)
 
 class EditCamera(APIView):
     renderer_classes = [IoT_PanelRenderer]
@@ -324,7 +336,11 @@ class RTMPDevices(APIView):
         data = []
         for c in conns:
             cam = cameras.get(c.get("path"))
+            ident = mediamtx_logs.decode_rtmp_path(c.get("path"), cameras) or {}
             data.append({
+                "model_number": ident.get("model_number"),
+                "serial_number": ident.get("serial_number"),
+                "identity_source": ident.get("source"),
                 "id": c.get("id"),
                 "remote_addr": c.get("remoteAddr"),
                 "path": c.get("path"),
@@ -436,6 +452,25 @@ class LiveStop(APIView):
 
 # --- request snapshots -------------------------------------------------------------------
 
+def request_camera_state(req):
+    """Why a request does / doesn't have snapshots: camera on its dispenser? session on? camera live?"""
+    du = DispenserUnits.objects.filter(imei_number=req.dispenser_imeinumber).first()
+    cams = list(Camera.objects.filter(dispenser_unit=du).order_by("id")) if du else []
+    state = {
+        "dispenser_serial_number": req.dispenser_serialnumber,
+        "dispenser_imei": req.dispenser_imeinumber,
+        "has_camera": bool(cams),
+        "camera_serial_numbers": [c.serial_number for c in cams],
+        "session_active": camera_service.active_sessions()
+        .filter(reason="fuel_request", transaction_id=req.transaction_id)
+        .exists(),
+        "live_status": None,
+    }
+    if cams and req.request_status not in camera_service.FINAL_STATUS_END_REASON:
+        state["live_status"] = camera_service.live_status_map(cams)[cams[0].id]["live_status"]
+    return state
+
+
 class GetRequestSnapshots(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -457,6 +492,7 @@ class GetRequestSnapshots(APIView):
             "snapshot_count": req.snapshot_count,
             "latest_snapshot_path": req.latest_snapshot_path,
             "snapshots": RequestCameraSnapshotSerializer(qs, many=True).data,
+            "camera_state": request_camera_state(req),
         }, status=status.HTTP_200_OK)
 
 
@@ -478,4 +514,73 @@ class GetLatestRequestSnapshot(APIView):
             "request_status": req.request_status,
             "snapshot_count": req.snapshot_count,
             "snapshot": RequestCameraSnapshotSerializer(latest).data if latest else None,
+            "camera_state": request_camera_state(req),
+        }, status=status.HTTP_200_OK)
+
+
+# --- live MediaMTX log (same lines as `docker logs mediamtx-server`) -------------------------
+
+LOG_SCOPES = ("cameras", "errors", "all")
+
+
+class MediaMTXLogs(APIView):
+    """GET camera/mediamtx/logs/?cursor=<c>&scope=cameras|errors|all&q=<text>&lines=300
+
+    First call (no cursor) returns the last `lines` lines; then pass back `cursor`
+    every ~2 s to get only new lines. Each line is parsed (time, level, component,
+    conn/ip, path) and enriched with the camera identity for its path."""
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user_id, roles = _user(request)
+        if IOT_ADMIN not in roles:
+            return _forbidden()
+        p = request.query_params
+        scope = p.get("scope", "cameras")
+        if scope not in LOG_SCOPES:
+            scope = "cameras"
+        q = (p.get("q") or "").strip().lower()
+        try:
+            initial = max(10, min(int(p.get("lines", 300)), 2000))
+        except ValueError:
+            initial = 300
+        try:
+            raw, cursor, rotated = mediamtx_logs.read(p.get("cursor") or None, initial_lines=initial)
+        except mediamtx_logs.LogsUnavailable as e:
+            return Response({"available": False, "error": str(e), "lines": [], "cursor": None}, status=status.HTTP_200_OK)
+        except OSError as e:
+            return Response({"available": False, "error": f"Cannot read MediaMTX log: {e}", "lines": [], "cursor": None}, status=status.HTTP_200_OK)
+
+        cameras = {c.rtmp_path: c for c in Camera.objects.select_related("dispenser_unit")}
+        conn_paths = {}
+        out = []
+        for line in raw:
+            e = mediamtx_logs.parse_line(line)
+            if e is None:
+                continue
+            # remember which path a connection belongs to (RTMP "opened"/"closed" lines carry no path)
+            if e["conn"] and e["path"]:
+                conn_paths[e["conn"]] = e["path"]
+            elif e["conn"] and not e["path"] and e["conn"] in conn_paths:
+                e["path"] = conn_paths[e["conn"]]
+            if scope == "errors" and e["level"] not in ("ERR", "WAR"):
+                continue
+            if scope == "cameras":
+                is_camera = e["component"] in ("RTMP", "WebRTC", "HLS") or (
+                    e["path"] and (e["path"] in cameras or e["path"].startswith("rtmp_push"))
+                )
+                if not is_camera:
+                    continue
+            if q and q not in e["text"].lower():
+                continue
+            e["camera"] = mediamtx_logs.decode_rtmp_path(e["path"], cameras)
+            out.append(e)
+        return Response({
+            "available": True,
+            "cursor": cursor,
+            "rotated": rotated,
+            "scope": scope,
+            "lines": out,
+            "conn_paths": conn_paths,
         }, status=status.HTTP_200_OK)

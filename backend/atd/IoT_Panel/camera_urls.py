@@ -8,6 +8,7 @@ urlpatterns = [
     path("camera/get/", GetCameras.as_view(), name="get-cameras"),
     path("camera/get/<int:id>/", GetCameraByID.as_view(), name="get-camera-by-id"),
     path("camera/get-by-dispenser/<int:dispenser_unit_id>/", GetCamerasByDispenser.as_view(), name="get-cameras-by-dispenser"),
+    path("camera/get-by-dispenser-imei/<str:imei>/", GetCamerasByDispenserIMEI.as_view(), name="get-cameras-by-dispenser-imei"),
     path("camera/edit/<int:id>/", EditCamera.as_view(), name="edit-camera"),
     path("camera/delete/<int:id>/", DeleteCamera.as_view(), name="delete-camera"),
 
@@ -19,6 +20,7 @@ urlpatterns = [
     path("camera/sessions/<int:id>/", CameraSessions.as_view(), name="camera-sessions"),
     path("camera/rtmp-devices/", RTMPDevices.as_view(), name="camera-rtmp-devices"),
     path("camera/mediamtx/health/", MediaMTXHealth.as_view(), name="camera-mediamtx-health"),
+    path("camera/mediamtx/logs/", MediaMTXLogs.as_view(), name="camera-mediamtx-logs"),
 
     # Live view
     path("camera/live/start/<int:camera_id>/", LiveStart.as_view(), name="camera-live-start"),

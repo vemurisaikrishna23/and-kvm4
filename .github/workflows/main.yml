@@ -58,6 +58,12 @@ jobs:
             #    If this fails the deploy stops here and the old containers keep running.
             docker run --rm --env-file $ENV_FILE $IMAGE python manage.py migrate --noinput
 
+            # Live log page: mount the mediamtx-server Docker log folder read-only (no MediaMTX change).
+            # If MediaMTX is ever recreated, redeploy the backend so this path is refreshed.
+            MTX_LOG=$(docker inspect -f '{{.LogPath}}' mediamtx-server 2>/dev/null || true)
+            MTX_LOG_MOUNT=""
+            if [ -n "$MTX_LOG" ]; then MTX_LOG_MOUNT="-v $(dirname $MTX_LOG):/mediamtx-logs:ro"; fi
+
             # 2) Replace the API container
             docker stop atd-backend || true
             docker rm -f atd-backend || true
@@ -73,6 +79,7 @@ jobs:
               --restart unless-stopped \
               --env-file $ENV_FILE \
               -v $APP_DIR/media:/app/media \
+              $MTX_LOG_MOUNT \
               -p 8003:8000 \
               $IMAGE
 

@@ -196,6 +196,8 @@ CAMERA_SNAPSHOT_WIDTH = int(os.environ.get("CAMERA_SNAPSHOT_WIDTH", "1280"))
 CAMERA_SNAPSHOT_RETENTION_DAYS = int(os.environ.get("CAMERA_SNAPSHOT_RETENTION_DAYS", "0"))  # 0 = keep all snapshots forever
 CAMERA_SNAPSHOT_DIR = os.environ.get("CAMERA_SNAPSHOT_DIR", "camera_snapshots")  # under MEDIA_ROOT
 FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
+# Read-only mount of the mediamtx-server Docker log folder (live log page)
+MEDIAMTX_LOG_DIR = os.environ.get("MEDIAMTX_LOG_DIR", "/mediamtx-logs")
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
