@@ -1,5 +1,6 @@
 from django.urls import path, include
 from .views import *
+from .dashboard_views import IoTAdminDashboard
 
 urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
@@ -77,6 +78,7 @@ urlpatterns = [
     path("dashboard/consumption/<int:customer_id>/", ConsumptionPageDashBoardView.as_view(), name="consumption page"),
     path("dashboard/reconsiliance/<int:customer_id>/", DailyReconciliationDashBoardView.as_view(), name="reconsiliance page"),
     path("dashboard/overview/<int:customer_id>/", OverviewDashboard.as_view(), name="overview page"),
+    path("dashboard/iot-admin/", IoTAdminDashboard.as_view(), name="iot-admin-dashboard"),
 
 
     path("order-request-fuel-dispensing/create/", CreateOrderRequestForFuelDispensing.as_view(), name="create-request-for-order-fuel-dispensing"),
