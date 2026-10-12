@@ -2617,6 +2617,12 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
     dispenser_volume = serializers.FloatField(required=False)
     dispenser_price = serializers.FloatField(required=False)
     remarks = serializers.CharField(required=False, allow_blank=True)
+    # Odometer at the moment the request is raised. The driver flow fills this
+    # from live OBD when it is reporting and lets the driver type it otherwise,
+    # so it is optional and nullable rather than required.
+    live_odometer_reading = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0
+    )
     def validate(self, data):
         user = self.context.get("user")
         login_user_id = getattr(user, "id", None)
@@ -2802,6 +2808,7 @@ class CreateRequestForOrderFuelDispensingSerializer(serializers.Serializer):
             request_status=0,
             fuel_state=False,
             transaction_log={},
+            live_odometer_reading=validated_data.get("live_odometer_reading"),
             remarks=remarks,
             buffer_reason=validated_data.get("buffer_reason"),
             request_created_at=timezone.now(),
