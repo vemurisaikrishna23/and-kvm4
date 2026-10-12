@@ -330,6 +330,16 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
         (2, 'Center'),
     ]
 
+    # Mirrors Dispenser_Gun_Mapping_To_Customer: reported by the hardware through
+    # msg_type 4's optional `gstatus`. The key being absent is meaningful in
+    # itself -- the dispenser is telling us nothing about its gun -- so it must
+    # not be read as either up or down.
+    Gun_Status = [
+        ('unavailable', 'Unavailable'),
+        ('online', 'Online'),
+        ('offline', 'Offline'),
+    ]
+
     # Dispenser protocol/brand the firmware must speak to. Published to the
     # hardware as msg_type 8's `dispenser_type`; 0 means nobody has told us yet,
     # which is not the same as a dispenser we know has no supported protocol.
@@ -356,6 +366,7 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
     status = models.BooleanField(default=True, help_text="to stop controls to the vehicles")
     machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
     connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
+    gun_status = models.CharField(max_length=12, choices=Gun_Status, default='unavailable', db_default='unavailable', help_text="Gun reachability from msg_type 4 `gstatus`: active -> online, inactive -> offline, key absent -> unavailable")
     installation_mode = models.IntegerField(default=0, choices=Installation_Mode, help_text="Installation Mode")
     # db_default as well as default: this table is also written by the Laravel app
     # and by app servers running older code, whose INSERTs omit the column

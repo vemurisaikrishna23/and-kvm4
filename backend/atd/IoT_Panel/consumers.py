@@ -16,7 +16,7 @@ django.setup()
 from asgiref.sync import sync_to_async
 from datetime import datetime
 from pytz import timezone 
-import base64, time
+import base64, math, time
 from .models import *
 from existing_tables.models import *
 from django.conf import settings
@@ -84,6 +84,85 @@ def resolve_gun_status(payload: dict) -> str:
 
     print(f"[GUN STATUS] Unrecognised gstatus={raw!r}; recording as {GUN_STATUS_UNAVAILABLE}")
     return GUN_STATUS_UNAVAILABLE
+
+
+# --- LIVE GPS PLAUSIBILITY (msg_type 31 `continuous_gps_push`) ---
+# A dispenser that reports a position several kilometres away moments after the
+# last one has not moved -- the frame is bad. Storing it makes the machine
+# "teleport" on the map and corrupts any distance figure derived from the live
+# point, so a jump that implies impossible movement is dropped and the previous
+# position is kept.
+#
+# The pair below reads as: within GPS_JUMP_MIN_INTERVAL_SECONDS of the last
+# stored point, a move of more than GPS_JUMP_MAX_DISTANCE_KM is rejected. Past
+# that interval nothing is checked, because enough time has passed for the
+# machine to legitimately be anywhere.
+#
+# 10 km per 5 min is an implied ceiling of 120 km/h, which leaves road speeds
+# alone -- including vehicle-mounted dispensers on a highway -- while still
+# catching the jumps that matter. Note the ceiling is only enforced inside the
+# interval: a jump larger than this over a *shorter* gap is still accepted, so
+# move to an implied-speed check if that turns out to matter.
+GPS_JUMP_MIN_INTERVAL_SECONDS = 300
+GPS_JUMP_MAX_DISTANCE_KM = 10.0
+
+EARTH_RADIUS_KM = 6371.0088
+
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    """Great-circle distance between two WGS84 points, in kilometres."""
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = phi2 - phi1
+    d_lambda = math.radians(lon2 - lon1)
+    a = (
+        math.sin(d_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(a))
+
+
+def validate_gps_jump(previous, lat, lon, epoch):
+    """
+    Decide whether a freshly reported position should replace the stored one.
+
+    Returns (accept, reason); reason is only meaningful when accept is False.
+    Anything it cannot evaluate -- no previous point, no timestamp on either
+    side -- is accepted, so the filter never blocks the first fix or rows
+    written before the epoch was being stored.
+    """
+    # msg_type 31 coerces a null lat/lon to 0.0, so (0, 0) reaches us as a
+    # position off West Africa. It means "no fix", never a real location.
+    if abs(lat) < 1e-9 and abs(lon) < 1e-9:
+        return False, "coordinates are (0, 0), which is a missing fix rather than a position"
+
+    if not isinstance(previous, dict):
+        return True, ""
+
+    try:
+        prev_lat = float(previous["lat"])
+        prev_lon = float(previous["lon"])
+        prev_epoch = int(previous["epoch"])
+    except (KeyError, TypeError, ValueError):
+        return True, ""
+
+    if epoch is None:
+        return True, ""
+
+    elapsed = int(epoch) - prev_epoch
+    # A negative interval is an out-of-order frame; there is no reliable
+    # interval to reason about, so leave it to the other guards.
+    if elapsed < 0 or elapsed > GPS_JUMP_MIN_INTERVAL_SECONDS:
+        return True, ""
+
+    distance = haversine_km(prev_lat, prev_lon, lat, lon)
+    if distance > GPS_JUMP_MAX_DISTANCE_KM:
+        return (
+            False,
+            f"moved {distance:.2f} km in {elapsed}s "
+            f"(limit {GPS_JUMP_MAX_DISTANCE_KM} km within {GPS_JUMP_MIN_INTERVAL_SECONDS}s)",
+        )
+
+    return True, ""
 
 
 def validate_fuel_sample(raw_adc, fuel_temperature=None, points=None):
@@ -428,7 +507,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         await self.send_error_message(f"Field type conversion error: {e}")
                         return
 
-                    await self.update_gps_coordinates(imei, gps_data, has_fix)
+                    await self.update_gps_coordinates(imei, gps_data, has_fix, epoch_time)
                     await self.update_price_fields(
                         imei=imei,
                         totalizer_reading=gvr_volume / 100.0,
@@ -966,9 +1045,39 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         except DispenserUnits.DoesNotExist:
             print(f"[ERROR] IMEI {imei} not found in DispenserUnits for gun status update")
             return
+        # Both mappings, the same way update_connectivity and update_machine_status
+        # do: a dispenser is assigned to a customer or to a vehicle, and the gun it
+        # reports on is the same physical gun either way.
         Dispenser_Gun_Mapping_To_Customer.objects.filter(
             dispenser_unit_id=dispenser.id
         ).update(gun_status=gun_status)
+        Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+            dispenser_unit_id=dispenser.id
+        ).update(gun_status=gun_status)
+
+        # Carry it onto the gun unit itself, mirroring how update_connectivity
+        # stamps DispenserUnits as well as the mappings. The gun is reached
+        # through whichever mapping this dispenser is assigned by -- gun_unit is
+        # nullable, so mappings without one contribute nothing.
+        gun_unit_ids = set()
+        for mapping_model in (
+            Dispenser_Gun_Mapping_To_Customer,
+            Dispenser_Gun_Mapping_To_Vehicles,
+        ):
+            gun_unit_ids.update(
+                mapping_model.objects.filter(dispenser_unit_id=dispenser.id)
+                .exclude(gun_unit_id__isnull=True)
+                .values_list("gun_unit_id", flat=True)
+            )
+
+        if gun_unit_ids:
+            # The same vocabulary the mapping column uses, so the two never
+            # disagree. NOTE: this column's db_comment still reads
+            # "online/offline/unknown" and should be updated to say
+            # "unavailable".
+            GunUnits.objects.filter(id__in=gun_unit_ids).update(
+                connectivity_status=gun_status
+            )
 
     @database_sync_to_async
     def update_machine_status(self, imei: str, status: str):
@@ -1298,7 +1407,7 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         ])
 
     @database_sync_to_async
-    def update_gps_coordinates(self, imei, gps_data: dict, has_fix: bool):
+    def update_gps_coordinates(self, imei, gps_data: dict, has_fix: bool, epoch=None):
         try:
             dispenser = DispenserUnits.objects.get(imei_number=imei)
             dispenser_mapping = None
@@ -1320,6 +1429,17 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             current_gps = dispenser_mapping.gps_coordinates or {}
 
             if has_fix:
+                accept, reason = validate_gps_jump(
+                    current_gps, gps_data.get("lat"), gps_data.get("lon"), epoch
+                )
+                if not accept:
+                    # Keep the last good position rather than storing a bad one.
+                    print(f"[GPS REJECT] IMEI {imei}: {reason}")
+                    return
+                # Stored so the next frame has a reliable interval to compare
+                # against; `time_utc` is a formatted string and not safe to parse.
+                if epoch is not None:
+                    gps_data["epoch"] = int(epoch)
                 gps_data["live_data"] = True
                 dispenser_mapping.gps_coordinates = gps_data
             else:
