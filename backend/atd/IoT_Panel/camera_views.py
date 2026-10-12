@@ -23,7 +23,7 @@ from .camera_serializers import (
     current_assignment,
 )
 from .mediamtx import MediaMTXError
-from .models import Camera, CameraEvent, CameraStreamSession, DispenserUnits, RequestCameraSnapshot, RequestFuelDispensingDetails
+from .models import Camera, CameraEvent, CameraStreamSession, DispenserUnits, OrderFuelDispensingDetails, RequestCameraSnapshot, RequestFuelDispensingDetails
 from .renderers import IoT_PanelRenderer
 from .views import FuelDispensingPagination, get_user_roles, is_customer_point_of_contact
 
@@ -51,8 +51,26 @@ def _get_camera(id):
 def can_view_camera(user_id, roles, camera):
     if IOT_ADMIN in roles:
         return True
+
     a = current_assignment(camera.dispenser_unit_id)
-    return bool(a and a.get("customer_id") and is_customer_point_of_contact(user_id, a["customer_id"]))
+    if not a:
+        return False
+
+    # Assigned to a customer: the customer's points of contact may watch it.
+    if a.get("customer_id"):
+        return is_customer_point_of_contact(user_id, a["customer_id"])
+
+    # Assigned to a vehicle (the route-plan flow). current_assignment returns no
+    # customer_id in that case, so the clause above used to reject everyone but
+    # IOT Admin -- a driver could not open the camera of the dispenser on their
+    # own vehicle. Scope it to exactly that: the driver who raised a fuel
+    # request on this vehicle, and nobody else.
+    if a.get("vehicle_id") and user_id is not None:
+        return OrderFuelDispensingDetails.objects.filter(
+            vehicle_id=a["vehicle_id"], driver_id=user_id
+        ).exists()
+
+    return False
 
 
 def can_view_request(user_id, roles, req):

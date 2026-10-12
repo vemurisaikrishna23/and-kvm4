@@ -1467,7 +1467,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             try:
                 txn = OrderFuelDispensingDetails.objects.get(transaction_id=transaction_id)
             except OrderFuelDispensingDetails.DoesNotExist:
-                return
+                # Must be a dict: the caller tests `if "error" in result`, which
+                # raises TypeError on None and takes the consumer down.
+                return {"error": "Transaction ID not found"}
         if txn.dispenser_imeinumber != imei:
             return {"error": "IMEI mismatch with transaction record."}
 
@@ -1687,10 +1689,16 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             return {"error": "Transaction ID not found"}
         txn = None
 
+        # A transaction lives in one of two tables: asset requests here, and
+        # order requests (the route-plan / vehicle-assigned flow) below. This
+        # used to `return` on the first miss, which made the Order lookup dead
+        # code -- every order transaction got
+        # "Request Fuel Dispensing ID not found with Transaction ID" and its
+        # status never advanced past Pending.
         try:
             txn = RequestFuelDispensingDetails.objects.get(transaction_id=transaction_id)
         except RequestFuelDispensingDetails.DoesNotExist:
-            return {"error": "Request Fuel Dispensing ID not found with Transaction ID"}
+            pass
 
         if txn is None:
             try:
