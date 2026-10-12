@@ -12,6 +12,7 @@ from django.db.models import Q, Sum, Count
 import time
 from datetime import datetime, timedelta
 from django.db import transaction
+from django.utils import timezone as dj_timezone
 from .camera_serializers import validate_camera_block, apply_camera_block
 
 def get_tokens_for_user(user):
@@ -2678,3 +2679,79 @@ class GetFuelReadingsLogsWithDispenserGunMappingVehicleID(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class GetRoutePlanRoutineProgressByRoutePlanId(APIView):
+    """Every routine's saved progress for one route plan, so the driver flow can
+    resume where it stopped instead of restarting at Start Day."""
+
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, route_plan_id, format=None):
+        queryset = RoutePlanRoutineProgress.objects.filter(
+            route_plan_id=route_plan_id
+        ).order_by("route_plan_details_id")
+        serializer = GetRoutePlanRoutineProgressSerializer(queryset, many=True)
+        # An empty list is a valid answer -- the plan simply has not been started.
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpsertRoutePlanRoutineProgress(APIView):
+    """Create or advance one routine's progress. Keyed on route_plan_details_id,
+    so the flow can call this on Start Day and on each Complete & Next without
+    tracking whether a row already exists."""
+
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        serializer = UpsertRoutePlanRoutineProgressSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        user_id = getattr(request.user, "id", None)
+        new_status = data["status"]
+
+        defaults = {
+            "route_plan_id": data["route_plan_id"],
+            "routine_type": data.get("routine_type") or None,
+            "status": new_status,
+            "performed_by": user_id,
+        }
+        # Timestamps are stamped on the transition, not overwritten on every
+        # call, so a re-sent "Completed" keeps the time it first completed.
+        if new_status == 1:
+            defaults["started_at"] = dj_timezone.now()
+        elif new_status == 2:
+            defaults["completed_at"] = dj_timezone.now()
+
+        row, created = RoutePlanRoutineProgress.objects.get_or_create(
+            route_plan_details_id=data["route_plan_details_id"],
+            defaults=defaults,
+        )
+        if not created:
+            row.route_plan_id = data["route_plan_id"]
+            if data.get("routine_type"):
+                row.routine_type = data["routine_type"]
+            row.status = new_status
+            row.performed_by = user_id
+            if new_status == 1 and row.started_at is None:
+                row.started_at = dj_timezone.now()
+            if new_status == 2 and row.completed_at is None:
+                row.completed_at = dj_timezone.now()
+            row.save(update_fields=[
+                "route_plan_id",
+                "routine_type",
+                "status",
+                "performed_by",
+                "started_at",
+                "completed_at",
+                "updated_at",
+            ])
+
+        return Response(
+            GetRoutePlanRoutineProgressSerializer(row).data,
+            status=status.HTTP_200_OK,
+        )

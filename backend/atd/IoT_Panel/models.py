@@ -647,3 +647,59 @@ class RequestCameraSnapshot(models.Model):
             models.Index(fields=["transaction_id", "captured_at"], name="rcs_txn_captured_idx"),
             models.Index(fields=["dispenser_unit", "captured_at"], name="rcs_dispenser_captured_idx"),
         ]
+
+
+class RoutePlanRoutineProgress(models.Model):
+    """
+    Per-routine execution state for a route plan's driver flow.
+
+    `route_plan_details` is Laravel-owned (managed = False) and has no column
+    that records a routine as started or finished: `reached_at`,
+    `delivery_time` and `performed_by` are never written and
+    `delivered_quantity` is 0 on every row. The driver flow therefore had
+    nowhere to persist its position and restarted from Start Day on every
+    refresh.
+
+    This table keeps that state on the Django side so nothing has to be written
+    into another application's schema. It is deliberately a thin side-table
+    keyed by the routine id -- if the Laravel side ever starts populating its
+    own execution columns, this can be dropped and read from there instead.
+    """
+
+    Routine_Status = [
+        (0, 'Pending'),
+        (1, 'In Progress'),
+        (2, 'Completed'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    route_plan_id = models.BigIntegerField(help_text="route_plans.id this routine belongs to")
+    # One row per routine, so the flow can upsert by this alone.
+    route_plan_details_id = models.BigIntegerField(
+        unique=True, help_text="route_plan_details.id -- the routine itself"
+    )
+    routine_type = models.CharField(
+        max_length=32, blank=True, null=True,
+        help_text="start | delivery | end, copied from the routine for readability",
+    )
+    status = models.IntegerField(
+        default=0, db_default=0, choices=Routine_Status, help_text="Routine progress"
+    )
+    started_at = models.DateTimeField(blank=True, null=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    performed_by = models.PositiveBigIntegerField(
+        blank=True, null=True, help_text="User who advanced this routine"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "route_plan_routine_progress"
+        verbose_name = "Route Plan Routine Progress"
+        verbose_name_plural = "Route Plan Routine Progress"
+        indexes = [
+            models.Index(fields=["route_plan_id"], name="rp_routine_progress_plan_idx"),
+        ]
+
+    def __str__(self):
+        return f"plan {self.route_plan_id} / routine {self.route_plan_details_id} = {self.status}"

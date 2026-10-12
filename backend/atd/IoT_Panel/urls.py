@@ -100,6 +100,6 @@ urlpatterns = [
 
     # Camera management, live view and request snapshots
     path("", include("IoT_Panel.camera_urls")),
+    path("route-plan-routine-progress/get/<int:route_plan_id>/", GetRoutePlanRoutineProgressByRoutePlanId.as_view(), name="get-route-plan-routine-progress-by-route-plan-id"),
+    path("route-plan-routine-progress/upsert/", UpsertRoutePlanRoutineProgress.as_view(), name="upsert-route-plan-routine-progress"),
 ]
-
-

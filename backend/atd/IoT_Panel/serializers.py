@@ -2859,3 +2859,30 @@ class GetFuelReadingsLogSerializer(serializers.ModelSerializer):
         model = FuelSensorReadings
         fields = '__all__'
 
+
+class GetRoutePlanRoutineProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoutePlanRoutineProgress
+        fields = [
+            'id',
+            'route_plan_id',
+            'route_plan_details_id',
+            'routine_type',
+            'status',
+            'started_at',
+            'completed_at',
+            'performed_by',
+            'updated_at',
+        ]
+
+
+class UpsertRoutePlanRoutineProgressSerializer(serializers.Serializer):
+    """
+    Validates one routine's progress. The view upserts on
+    route_plan_details_id, so the same call both creates and advances a routine.
+    """
+
+    route_plan_id = serializers.IntegerField()
+    route_plan_details_id = serializers.IntegerField()
+    routine_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    status = serializers.ChoiceField(choices=[c[0] for c in RoutePlanRoutineProgress.Routine_Status])
