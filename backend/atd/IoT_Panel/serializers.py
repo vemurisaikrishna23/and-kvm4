@@ -396,6 +396,7 @@ class CreateDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer)
     fuel_level_sensor_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
     tank_capacity = serializers.FloatField(required=False, allow_null=True)
+    dispenser_type = serializers.IntegerField(required=False)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Customer
         fields = [
@@ -414,6 +415,7 @@ class CreateDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer)
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
             'tank_capacity',
+            'dispenser_type',
         ]
 
     def validate_customer(self, value):
@@ -571,6 +573,7 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
     fuel_level_sensor_configuration = serializers.JSONField(required=False, allow_null=True)
     
     tank_capacity = serializers.FloatField(required=False, allow_null=True)
+    dispenser_type = serializers.IntegerField(required=False)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Customer
         fields = [
@@ -588,6 +591,7 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
             'fuel_level_sensor_description',
             'fuel_level_sensor_configuration',
             'tank_capacity',
+            'dispenser_type',
         ]
     def validate(self, attrs):
         instance = self.instance
@@ -596,19 +600,36 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
 
         fuel_sensor = attrs.get('fuel_level_sensor', instance.fuel_level_sensor)
 
-        fuel_fields = [
-            attrs.get('fuel_level_sensor_type', instance.fuel_level_sensor_type),
-            attrs.get('fuel_level_sensor_brand', instance.fuel_level_sensor_brand),
-            attrs.get('fuel_level_sensor_description', instance.fuel_level_sensor_description),
-            attrs.get('fuel_level_sensor_configuration', instance.fuel_level_sensor_configuration),
-        ]
-
-        fuel_data_provided = any(v not in [None, '', {}] for v in fuel_fields)
+        # Only what this request actually sent counts as "details provided".
+        # Falling back to the instance made disabling the sensor impossible: the
+        # row's own stored type and brand were read back as if they were new
+        # details, so `fuel_level_sensor: False` was always rejected. Type 0 is
+        # the 'None' choice, so it is an absence rather than a detail.
+        detail_fields = (
+            'fuel_level_sensor_type',
+            'fuel_level_sensor_brand',
+            'fuel_level_sensor_description',
+            'fuel_level_sensor_configuration',
+        )
+        empty_values = [None, '', {}]
+        fuel_data_provided = any(
+            attrs[field] not in (empty_values + [0] if field == 'fuel_level_sensor_type' else empty_values)
+            for field in detail_fields
+            if field in attrs
+        )
 
         if fuel_data_provided and not fuel_sensor:
             raise serializers.ValidationError({
                 "fuel_level_sensor": "fuel_level_sensor must be enabled to provide fuel sensor details."
             })
+
+        # Turning the sensor off clears its details, so a row can never keep a
+        # brand or calibration table that the check above treats as invalid.
+        if not fuel_sensor:
+            attrs['fuel_level_sensor_type'] = 0
+            attrs['fuel_level_sensor_brand'] = None
+            attrs['fuel_level_sensor_description'] = None
+            attrs['fuel_level_sensor_configuration'] = None
 
         new_dispenser = attrs.get('dispenser_unit', serializers.empty)
         if new_dispenser is not serializers.empty and new_dispenser != instance.dispenser_unit:
@@ -642,6 +663,7 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
             'nozzle',
             'remarks',
             'tank_capacity',
+            'dispenser_type',
         ]:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
@@ -666,7 +688,10 @@ class EditDispenserGunMappingToCustomerSerializer(serializers.ModelSerializer):
                 'fuel_level_sensor_configuration', instance.fuel_level_sensor_configuration
             )
         else:
-            instance.fuel_level_sensor_type = None
+            # 0 is the 'None' choice. This column is IntegerField(default=0) with
+            # no null=True, so writing None here raised a NOT NULL violation and
+            # made disabling the sensor fail even once validation allowed it.
+            instance.fuel_level_sensor_type = 0
             instance.fuel_level_sensor_brand = None
             instance.fuel_level_sensor_description = None
             instance.fuel_level_sensor_configuration = None
@@ -2087,6 +2112,7 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
     odometer_reading = serializers.IntegerField(required=False, allow_null=True)
     odometer_mac_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     tank_capacity = serializers.FloatField(required=False, allow_null=True)
+    dispenser_type = serializers.IntegerField(required=False)
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
         fields = [
@@ -2109,7 +2135,8 @@ class CreateDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer)
             'tank_capacity',
             'obd_sensor',
             'odometer_reading',
-            'odometer_mac_id'
+            'odometer_mac_id',
+            'dispenser_type',
         ]
 
     def validate_vehicle(self, value):
@@ -2289,6 +2316,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
     obd_sensor = serializers.BooleanField(required=False)
     odometer_reading = serializers.IntegerField(required=False, allow_null=True)
     odometer_mac_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    dispenser_type = serializers.IntegerField(required=False)
 
     class Meta:
         model = Dispenser_Gun_Mapping_To_Vehicles
@@ -2312,6 +2340,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'obd_sensor',
             'odometer_reading',
             'odometer_mac_id',
+            'dispenser_type',
         ]
 
     def validate(self, attrs):
@@ -2321,14 +2350,23 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
 
         fuel_sensor = attrs.get('fuel_level_sensor', instance.fuel_level_sensor)
 
-        fuel_fields = [
-            attrs.get('fuel_level_sensor_type', instance.fuel_level_sensor_type),
-            attrs.get('fuel_level_sensor_brand', instance.fuel_level_sensor_brand),
-            attrs.get('fuel_level_sensor_description', instance.fuel_level_sensor_description),
-            attrs.get('fuel_level_sensor_configuration', instance.fuel_level_sensor_configuration),
-        ]
-
-        fuel_data_provided = any(v not in [None, '', {}] for v in fuel_fields)
+        # Only what this request actually sent counts as "details provided".
+        # Falling back to the instance made disabling the sensor impossible: the
+        # row's own stored type and brand were read back as if they were new
+        # details, so `fuel_level_sensor: False` was always rejected. Type 0 is
+        # the 'None' choice, so it is an absence rather than a detail.
+        detail_fields = (
+            'fuel_level_sensor_type',
+            'fuel_level_sensor_brand',
+            'fuel_level_sensor_description',
+            'fuel_level_sensor_configuration',
+        )
+        empty_values = [None, '', {}]
+        fuel_data_provided = any(
+            attrs[field] not in (empty_values + [0] if field == 'fuel_level_sensor_type' else empty_values)
+            for field in detail_fields
+            if field in attrs
+        )
 
         if fuel_data_provided and not fuel_sensor:
             raise serializers.ValidationError({
@@ -2336,6 +2374,14 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
                     "fuel_level_sensor must be enabled to provide fuel sensor details."
                 )
             })
+
+        # Turning the sensor off clears its details, so a row can never keep a
+        # brand or calibration table that the check above treats as invalid.
+        if not fuel_sensor:
+            attrs['fuel_level_sensor_type'] = 0
+            attrs['fuel_level_sensor_brand'] = None
+            attrs['fuel_level_sensor_description'] = None
+            attrs['fuel_level_sensor_configuration'] = None
 
         obd_sensor = attrs.get('obd_sensor', instance.obd_sensor)
 
@@ -2386,6 +2432,7 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
             'nozzle',
             'remarks',
             'tank_capacity',
+            'dispenser_type',
         ]:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
@@ -2409,7 +2456,10 @@ class EditDispenserGunMappingToVehiclesSerializer(serializers.ModelSerializer):
                 'fuel_level_sensor_configuration', instance.fuel_level_sensor_configuration
             )
         else:
-            instance.fuel_level_sensor_type = None
+            # 0 is the 'None' choice. This column is IntegerField(default=0) with
+            # no null=True, so writing None here raised a NOT NULL violation and
+            # made disabling the sensor fail even once validation allowed it.
+            instance.fuel_level_sensor_type = 0
             instance.fuel_level_sensor_brand = None
             instance.fuel_level_sensor_description = None
             instance.fuel_level_sensor_configuration = None

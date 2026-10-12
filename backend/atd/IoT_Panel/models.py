@@ -96,6 +96,16 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
         ('online', 'Online'),
         ('offline', 'Offline'),
     ]
+
+    # Dispenser protocol/brand the firmware must speak to. Published to the
+    # hardware as msg_type 8's `dispenser_type`; 0 means nobody has told us yet,
+    # which is not the same as a dispenser we know has no supported protocol.
+    Dispenser_Type = [
+        (0, 'Unknown'),
+        (1, 'Gilbarco Veeder-Root (GVR)'),
+        (2, 'ATD Dispenser V1'),
+    ]
+
     id = models.BigAutoField(primary_key=True)
     dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE)
     gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE,blank=True, null=True)
@@ -112,8 +122,14 @@ class Dispenser_Gun_Mapping_To_Customer(models.Model):
     status = models.BooleanField(default=True, help_text="to stop controls to the customer")
     machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
     connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
-    gun_status = models.CharField(max_length=12, choices=Gun_Status, default='unavailable', help_text="Gun reachability from msg_type 4 `gstatus`: active -> online, inactive -> offline, key absent -> unavailable")
+    gun_status = models.CharField(max_length=12, choices=Gun_Status, default='unavailable', db_default='unavailable', help_text="Gun reachability from msg_type 4 `gstatus`: active -> online, inactive -> offline, key absent -> unavailable")
     installation_mode = models.IntegerField(default=0, choices=Installation_Mode, help_text="Installation Mode")
+    # db_default as well as default: this table is also written by the Laravel app
+    # and by app servers running older code, whose INSERTs omit the column
+    # entirely. Without a default in the schema, MySQL in STRICT_TRANS_TABLES
+    # rejects those with (1364, "Field 'dispenser_type' doesn't have a default
+    # value").
+    dispenser_type = models.IntegerField(default=0, db_default=0, choices=Dispenser_Type, help_text="Dispenser make/protocol published to the hardware in msg_type 8")
     fuel_level_sensor = models.BooleanField(default=False, help_text="Whether the tank is installed with fuel level sensor or not")
     fuel_level_sensor_type = models.IntegerField(default=0, choices=Fuel_Level_Sensor_Type, help_text="Fuel Level Sensor Type")
     fuel_level_sensor_brand = models.CharField(max_length=100,blank=True,null=True,db_comment="Brand of the Fuel Level Sensor")
@@ -314,6 +330,15 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
         (2, 'Center'),
     ]
 
+    # Dispenser protocol/brand the firmware must speak to. Published to the
+    # hardware as msg_type 8's `dispenser_type`; 0 means nobody has told us yet,
+    # which is not the same as a dispenser we know has no supported protocol.
+    Dispenser_Type = [
+        (0, 'Unknown'),
+        (1, 'Gilbarco Veeder-Root (GVR)'),
+        (2, 'ATD Dispenser V1'),
+    ]
+
     id = models.BigAutoField(primary_key=True)
     dispenser_unit = models.ForeignKey('DispenserUnits', on_delete=models.CASCADE)
     gun_unit = models.ForeignKey('GunUnits', on_delete=models.CASCADE,blank=True, null=True)
@@ -332,6 +357,12 @@ class Dispenser_Gun_Mapping_To_Vehicles(models.Model):
     machine_status = models.IntegerField(default=0, choices=Machine_Status, help_text="Machine status")
     connectivity_status = models.BooleanField(default=False, help_text="Whether the machine is connected to the websocket server or not")
     installation_mode = models.IntegerField(default=0, choices=Installation_Mode, help_text="Installation Mode")
+    # db_default as well as default: this table is also written by the Laravel app
+    # and by app servers running older code, whose INSERTs omit the column
+    # entirely. Without a default in the schema, MySQL in STRICT_TRANS_TABLES
+    # rejects those with (1364, "Field 'dispenser_type' doesn't have a default
+    # value").
+    dispenser_type = models.IntegerField(default=0, db_default=0, choices=Dispenser_Type, help_text="Dispenser make/protocol published to the hardware in msg_type 8")
     fuel_level_sensor = models.BooleanField(default=False, help_text="Whether the tank is installed with fuel level sensor or not")
     fuel_level_sensor_type = models.IntegerField(default=0, choices=Fuel_Level_Sensor_Type, help_text="Fuel Level Sensor Type")
     fuel_level_sensor_brand = models.CharField(max_length=100,blank=True,null=True,db_comment="Brand of the Fuel Level Sensor")

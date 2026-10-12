@@ -117,7 +117,20 @@ DATABASES = {
         "HOST": "Atd-iot-db.coh7dtk0kjb8.ap-south-1.rds.amazonaws.com",
         # "HOST": "65.1.231.95",
         "PORT": "3306",
-        "CONN_MAX_AGE": 1800,  # keep as is
+        # Close each connection when its request/consumer call finishes.
+        #
+        # This server runs under ASGI, where Django's thread-local connections
+        # mean every worker thread opens one of its own. With a non-zero
+        # CONN_MAX_AGE those were held for the full window and
+        # close_old_connections() became a no-op, so connections accumulated
+        # per thread until MySQL hit its cap (max_connections is only 60, and
+        # the deployed host shares it with local dev) and every request failed
+        # with "(1040, 'Too many connections')". wait_timeout is 8h, so the
+        # server would not reap them either.
+        #
+        # 0 costs a connect per request -- a few ms to RDS in the same region --
+        # and in exchange bounds usage to the number of in-flight requests.
+        "CONN_MAX_AGE": 0,
             "OPTIONS": {
             "charset": "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",

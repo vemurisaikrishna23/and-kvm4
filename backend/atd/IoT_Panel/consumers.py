@@ -21,7 +21,7 @@ from .models import *
 from existing_tables.models import *
 from django.conf import settings
 from django.utils import timezone as dj_timezone
-from django.db import close_old_connections
+from django.db import connections, close_old_connections
 from . import camera_service
 from datetime import datetime
 
@@ -911,7 +911,12 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             try:
                 fn(*args)
             finally:
-                close_old_connections()
+                # This runs on a throwaway thread, so the connection it opened is
+                # thread-local and nothing else will ever reuse or close it.
+                # close_all() closes it outright; close_old_connections() only
+                # closes connections past CONN_MAX_AGE, which leaked one MySQL
+                # connection per hook call whenever that was non-zero.
+                connections.close_all()
 
         async def run():
             try:
