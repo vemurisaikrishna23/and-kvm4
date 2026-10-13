@@ -68,6 +68,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Logs every API request/response (and 4xx/5xx bodies) through logging, so the
+    # live log viewer is complete without relying on captured stdout.
+    'IoT_Panel.request_logging.RequestLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'atd.urls'
@@ -101,7 +104,82 @@ MY_SHARED_SECRET_KEY = "atd_shared_secret_key"
 #            the REST endpoint / mapping serializers
 # Totalizer fields (live_totalizer_reading, live_total_reading_amount) are
 # unaffected either way and always refresh from the hardware.
-UPDATE_LIVE_PRICE_FROM_WEBSOCKET = False
+UPDATE_LIVE_PRICE_FROM_WEBSOCKET = True
+
+# --- Backend log file (live log viewer) ---------------------------------------
+# Most diagnostics in this project are print() calls, which go to the process's
+# stdout and never reach a logging handler. run.sh tees stdout/stderr into this
+# file, and the LOGGING config below points Django's own loggers at the same
+# file, so one file holds everything an operator sees in the terminal. The
+# IoT Admin-only endpoint api/app-logs/ tails it.
+APP_LOG_DIR = BASE_DIR / "logs"
+APP_LOG_FILE = APP_LOG_DIR / "atd.log"
+APP_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# run.sh tees the process's stdout into APP_LOG_FILE so print() is captured, and
+# exports this flag. When it is set, attaching a file handler as well would write
+# every logging line to the same file twice -- and the teed copy escapes
+# RotatingFileHandler's size cap. So: tee present -> console only; launched any
+# other way (the Dockerfile runs daphne directly) -> write the file ourselves.
+LOG_VIA_STDOUT = os.environ.get("ATD_LOG_VIA_STDOUT") == "1"
+_LOG_HANDLERS = ["console"] if LOG_VIA_STDOUT else ["console", "file"]
+
+# Request/response and WebSocket payload logging. Bodies are trimmed and passed
+# through app_logs.redact first. Turn LOG_HTTP_BODIES off to log only the access
+# lines, or lower LOG_BODY_MAX_CHARS if the log grows too fast.
+LOG_HTTP_BODIES = True
+# Produce the per-request / per-frame log only while someone has the live log
+# page open. WARNING and above are always recorded regardless. Set False to log
+# unconditionally.
+LOG_ONLY_WHEN_WATCHED = True
+LOG_WS_PAYLOADS = True
+LOG_BODY_MAX_CHARS = 2000
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        # Matches what IoT_Panel/app_logs.parse_line expects.
+        "atd": {"format": "{levelname} {asctime} {name}: {message}", "style": "{"},
+    },
+    "filters": {
+        # Keeps the log viewer's own polling out of both the terminal and the file.
+        "skip_log_viewer": {"()": "IoT_Panel.log_filters.SkipLogViewerAccess"},
+        # Verbose traffic records are written only while the log page is open.
+        "only_when_watched": {"()": "IoT_Panel.log_filters.OnlyWhenWatched"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "atd",
+            "filters": ["skip_log_viewer", "only_when_watched"],
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(APP_LOG_FILE),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",
+            "formatter": "atd",
+            "filters": ["skip_log_viewer", "only_when_watched"],
+        },
+    },
+    "root": {"handlers": _LOG_HANDLERS, "level": "INFO"},
+    "loggers": {
+        "django": {"handlers": _LOG_HANDLERS, "level": "INFO", "propagate": False},
+        # Request failures (500s with tracebacks) are the main thing worth seeing.
+        "django.request": {"handlers": _LOG_HANDLERS, "level": "WARNING", "propagate": False},
+        "IoT_Panel": {"handlers": _LOG_HANDLERS, "level": "INFO", "propagate": False},
+        "IoT_Panel.http": {"handlers": _LOG_HANDLERS, "level": "INFO", "propagate": False},
+        "IoT_Panel.ws": {"handlers": _LOG_HANDLERS, "level": "INFO", "propagate": False},
+        # The ASGI server's own access lines duplicate what
+        # RequestLoggingMiddleware already records -- and with less detail, since
+        # it has no duration or user. Kept at WARNING so transport-level problems
+        # still surface without logging every request twice.
+        "daphne": {"handlers": _LOG_HANDLERS, "level": "WARNING", "propagate": False},
+        "django.channels.server": {"handlers": _LOG_HANDLERS, "level": "WARNING", "propagate": False},
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases

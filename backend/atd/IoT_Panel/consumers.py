@@ -17,12 +17,45 @@ from asgiref.sync import sync_to_async
 from datetime import datetime
 from pytz import timezone 
 import base64, math, time
+import logging
 from .models import *
 from existing_tables.models import *
 from django.conf import settings
 from django.utils import timezone as dj_timezone
 from django.db import connections, close_old_connections
-from . import camera_service
+from . import app_logs, log_presence, camera_service
+
+# Every frame in and out goes through logging as well, so the live log viewer
+# shows WebSocket traffic rather than only what print() happened to cover.
+ws_log = logging.getLogger("IoT_Panel.ws")
+
+
+def _ws_line(action, imei, detail=""):
+    """
+    One shape for every WebSocket log line, so a column of them reads cleanly:
+
+        WS   CONNECT      865405076845555  hardware · epoch 1760000000
+        WS   RX type 4    865405076845555  hardware · {"mstatus":1,...}
+        WS   TX type 6    865405076845555           · {"status":"valid"}
+
+    `action` is padded so the imei always starts in the same column.
+    """
+    return f"WS   {action:<12} {imei or '-':<15}  {detail}"
+
+
+def _ws_payload(text):
+    """Trimmed, redacted one-line form of a frame for the log."""
+    if not getattr(settings, "LOG_WS_PAYLOADS", True):
+        return ""
+    # The filter would drop the record anyway; returning early also skips the
+    # redact pass, which is the expensive part of logging a frame.
+    if not log_presence.is_watched():
+        return ""
+    limit = getattr(settings, "LOG_BODY_MAX_CHARS", 2000)
+    body = (text or "").replace("\n", " ")
+    if len(body) > limit:
+        body = f"{body[:limit]}… (+{len(body) - limit} chars)"
+    return app_logs.redact(body)
 from datetime import datetime
 
 # --- GLOBAL CONNECTION TRACKER ---
@@ -333,18 +366,22 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
         # Reject if client_type is not hardware or web
         if self.client_type not in ['hardware', 'web']:
+            ws_log.warning(_ws_line("REJECT", self.imei_number,
+                                    f"bad client_type '{self.client_type}' · closed 4002"))
             await self.close(code=4002)
             return
 
         # Token verification
         is_valid = await self.verify_token_and_match_imei(self.token, self.imei_number)
         if not is_valid:
+            ws_log.warning(_ws_line("REJECT", self.imei_number, "bad token · closed 4001"))
             await self.close(code=4001)
             return
 
         # Common check: IMEI exists and assigned
         imei_ok = await self.is_imei_assigned(self.imei_number)
         if not imei_ok:
+            ws_log.warning(_ws_line("REJECT", self.imei_number, "IMEI not assigned · closed 4003"))
             await self.close(code=4003)
             return
 
@@ -361,7 +398,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             "epoch_time": current_epoch,
             "message": "connected",
         }))
-        print(f"[CONNECT] Sent epoch={current_epoch} to client IMEI={self.imei_number} type={self.client_type}")
+        ws_log.info(_ws_line("CONNECT", self.imei_number,
+                             f"{self.client_type} · epoch {current_epoch}"))
 
         # If hardware client → update connectivity status
         if self.client_type == 'hardware':
@@ -370,6 +408,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             print("web client connected")
 
     async def disconnect(self, close_code):
+        ws_log.info(_ws_line("DISCONNECT", getattr(self, "imei_number", None),
+                             f"{getattr(self, 'client_type', '-')} · closed {close_code}"))
         await self.channel_layer.group_discard(self.room_id, self.channel_name)
         await self.remove_connected_client()
 
@@ -384,8 +424,19 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             try:
                 data = json.loads(text_data)
             except json.JSONDecodeError:
+                ws_log.warning(
+                    _ws_line("RX", self.imei_number,
+                             f"{self.client_type} · invalid JSON · {_ws_payload(text_data)}")
+                )
                 await self.send_error_message("Invalid JSON format")
                 return
+
+            # Logged after parsing so the line can name the message type -- the
+            # single most useful thing to see without reading the payload.
+            ws_log.info(
+                _ws_line(f"RX type {data.get('type')}", self.imei_number,
+                         f"{self.client_type} · {_ws_payload(text_data)}")
+            )
 
             # Mandatory fields check
             if "type" not in data or "machine" not in data:
@@ -943,6 +994,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 },
             )
         elif bytes_data is not None:
+            ws_log.info(_ws_line("RX binary", self.imei_number,
+                                 f"{self.client_type} · {len(bytes_data)} bytes"))
             await self.channel_layer.group_send(
                 self.room_id,
                 {
@@ -954,6 +1007,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         
     async def dispenser_text(self, event):
         if event["sender_channel_name"] != self.channel_name:
+            ws_log.info(_ws_line("RELAY", self.imei_number,
+                                 f"to {self.client_type} · {_ws_payload(event['text'])}"))
             await self.send(text_data=event["text"])
 
     async def dispenser_bytes(self, event):
@@ -977,10 +1032,14 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                 pass
 
     async def send_error_message(self, error_message):
+        ws_log.warning(_ws_line("TX error", self.imei_number, error_message))
         await self.send(text_data=json.dumps({"error": error_message}))
 
     async def send_data(self, data):
-        await self.send(text_data=json.dumps(data))
+        payload = json.dumps(data)
+        action = f"TX type {data.get('type')}" if isinstance(data, dict) else "TX"
+        ws_log.info(_ws_line(action, self.imei_number, _ws_payload(payload)))
+        await self.send(text_data=payload)
 
     def camera_hook(self, fn, *args):
         """Run a camera hook in the background so the websocket never waits on it.

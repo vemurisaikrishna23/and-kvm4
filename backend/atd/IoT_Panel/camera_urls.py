@@ -21,6 +21,9 @@ urlpatterns = [
     path("camera/rtmp-devices/", RTMPDevices.as_view(), name="camera-rtmp-devices"),
     path("camera/mediamtx/health/", MediaMTXHealth.as_view(), name="camera-mediamtx-health"),
     path("camera/mediamtx/logs/", MediaMTXLogs.as_view(), name="camera-mediamtx-logs"),
+    # Backend log tail for the IoT Admin live viewer
+    path("app-logs/", AppLogs.as_view(), name="app-logs"),
+    path("app-logs/clear/", ClearAppLogs.as_view(), name="app-logs-clear"),
 
     # Live view
     path("camera/live/start/<int:camera_id>/", LiveStart.as_view(), name="camera-live-start"),
@@ -30,4 +33,5 @@ urlpatterns = [
     # Request snapshots
     path("request-fuel-dispensing/snapshots/<int:request_id>/", GetRequestSnapshots.as_view(), name="get-request-snapshots"),
     path("request-fuel-dispensing/snapshots/<int:request_id>/latest/", GetLatestRequestSnapshot.as_view(), name="get-latest-request-snapshot"),
+    path("order-request-fuel-dispensing/snapshots/<int:request_id>/", GetOrderRequestSnapshots.as_view(), name="get-order-request-snapshots"),
 ]

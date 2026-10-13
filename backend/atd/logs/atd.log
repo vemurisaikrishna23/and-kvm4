@@ -1,0 +1,7 @@
+WARNING 2026-10-12 23:08:28,854 IoT_Panel: Server log cleared by user_id=6789
+INFO 2026-10-12 23:08:37,340 IoT_Panel.http: HTTP GET    200 2777ms  /api/camera/mediamtx/health/   user 6789
+INFO 2026-10-12 23:08:37,373 IoT_Panel.http: HTTP GET    200 2810ms  /api/camera/get/   user 6789
+INFO 2026-10-12 23:08:40,714 IoT_Panel.http: HTTP GET    200 3369ms  /api/camera/mediamtx/health/   user 6789
+INFO 2026-10-12 23:08:40,869 IoT_Panel.http: HTTP GET    200 3493ms  /api/camera/get/   user 6789
+INFO 2026-10-12 23:08:52,094 IoT_Panel.http: HTTP GET    200 2599ms  /api/camera/mediamtx/health/   user 6789
+INFO 2026-10-12 23:08:52,195 IoT_Panel.http: HTTP GET    200 2701ms  /api/camera/get/   user 6789

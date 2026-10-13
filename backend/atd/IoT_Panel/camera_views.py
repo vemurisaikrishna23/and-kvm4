@@ -1,6 +1,7 @@
 """
 Camera management APIs. Design: ATD_Server/CAMERA_MANAGEMENT_DESIGN.md (section 7).
 """
+import logging
 from datetime import timedelta
 
 from django.conf import settings
@@ -14,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from existing_tables.models import PointOfContacts
-from . import camera_service, mediamtx, mediamtx_logs
+from . import mediamtx, app_logs, log_presence, camera_service, mediamtx_logs
 from .camera_serializers import (
     CameraEventSerializer,
     CameraSerializer,
@@ -81,6 +82,27 @@ def can_view_request(user_id, roles, req):
         poc = PointOfContacts.objects.filter(user_id=user_id, belong_to_type="customer").first()
         return bool(poc and req.customer_id == poc.belong_to_id)
     return True
+
+
+def can_view_order_request(user_id, roles, order):
+    """
+    Who may see an order request's snapshots (the route-plan / vehicle flow).
+
+    can_view_request is not reusable here: it gates on REQUEST_VIEW_ROLES, which
+    does not include "Driver" -- the only role the drivers who raise these
+    requests actually hold -- so it rejects the people the screen is built for.
+    Scope it to the request's own driver instead, plus IOT Admin and the
+    customer's points of contact.
+    """
+    if IOT_ADMIN in roles:
+        return True
+    if user_id is None:
+        return False
+    if order.driver_id and order.driver_id == user_id:
+        return True
+    if order.customer_id:
+        return is_customer_point_of_contact(user_id, order.customer_id)
+    return False
 
 
 def _with_live(data_list, cameras):
@@ -514,6 +536,43 @@ class GetRequestSnapshots(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class GetOrderRequestSnapshots(APIView):
+    """Snapshots of an order request (route-plan flow).
+
+    RequestCameraSnapshot carries both a `request` and an `order_request` FK and
+    the camera worker stamps whichever applies, but GetRequestSnapshots only
+    ever looked in RequestFuelDispensingDetails -- so order requests had no way
+    to read the snapshots that were being captured for them.
+    """
+
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, request_id, format=None):
+        user_id, roles = _user(request)
+        order = OrderFuelDispensingDetails.objects.filter(id=request_id).first()
+        if order is None:
+            return _not_found("Order Fuel Dispensing Request ID not found.")
+        if not can_view_order_request(user_id, roles, order):
+            return _forbidden("You are not authorized to access this data.")
+        qs = RequestCameraSnapshot.objects.filter(order_request=order).order_by("captured_at")
+        if request.query_params.get("kind") in ("periodic", "stage"):
+            qs = qs.filter(kind=request.query_params["kind"])
+        snapshots = RequestCameraSnapshotSerializer(qs, many=True).data
+        latest = qs.last()
+        return Response({
+            "request_id": order.id,
+            "transaction_id": order.transaction_id,
+            "request_status": order.request_status,
+            # This table has no denormalised snapshot_count / latest_snapshot_path
+            # columns, so both are derived from the rows themselves.
+            "snapshot_count": len(snapshots),
+            "latest_snapshot_path": getattr(latest, "image_path", None),
+            "snapshots": snapshots,
+            "camera_state": request_camera_state(order),
+        }, status=status.HTTP_200_OK)
+
+
 class GetLatestRequestSnapshot(APIView):
     renderer_classes = [IoT_PanelRenderer]
     permission_classes = [IsAuthenticated]
@@ -602,3 +661,108 @@ class MediaMTXLogs(APIView):
             "lines": out,
             "conn_paths": conn_paths,
         }, status=status.HTTP_200_OK)
+
+
+class AppLogs(APIView):
+    """GET api/app-logs/?cursor=<c>&level=all|error|warning&q=<text>&lines=300
+
+    The backend's own log, for the IoT Admin ("super admin") live viewer. Same
+    cursor contract as MediaMTXLogs: the first call returns the last `lines`
+    lines, then the caller passes `cursor` back every couple of seconds and gets
+    only what is new. `rotated` tells the client its view was replaced rather
+    than appended to.
+
+    Lines are redacted in app_logs.redact before they leave the server -- a
+    console is not a safe place to publish tokens from.
+    """
+
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user_id, roles = _user(request)
+        if IOT_ADMIN not in roles:
+            return _forbidden("You are not authorized to read the server log.")
+
+        # Someone is watching: this is what turns the verbose logging on.
+        log_presence.touch()
+
+        p = request.query_params
+        level = (p.get("level") or "all").lower()
+        q = (p.get("q") or "").strip().lower()
+        try:
+            initial = max(10, min(int(p.get("lines", app_logs.DEFAULT_LINES)), app_logs.MAX_LINES))
+        except ValueError:
+            initial = app_logs.DEFAULT_LINES
+
+        try:
+            raw, cursor, rotated = app_logs.read(p.get("cursor") or None, initial_lines=initial)
+        except app_logs.LogsUnavailable as e:
+            return Response(
+                {"available": False, "error": str(e), "lines": [], "cursor": None, "rotated": False},
+                status=status.HTTP_200_OK,
+            )
+        except OSError as e:
+            return Response(
+                {
+                    "available": False,
+                    "error": f"Cannot read the server log: {e}",
+                    "lines": [],
+                    "cursor": None,
+                    "rotated": False,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        wanted = {"error": {"ERROR"}, "warning": {"ERROR", "WARNING"}}.get(level)
+        out = []
+        for line in raw:
+            entry = app_logs.parse_line(line)
+            if entry is None:
+                continue
+            if wanted and entry["level"] not in wanted:
+                continue
+            if q and q not in entry["raw"].lower():
+                continue
+            out.append(entry)
+
+        return Response(
+            {
+                "available": True,
+                "lines": out,
+                "cursor": cursor,
+                "rotated": rotated,
+                "file": app_logs.log_path(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ClearAppLogs(APIView):
+    """POST api/app-logs/clear/ -- empty the server log file.
+
+    Destructive and IoT Admin only. The file is truncated rather than deleted so
+    the running server's open descriptors keep working, and the clear itself is
+    logged immediately afterwards so the fresh file records who emptied it.
+    """
+
+    renderer_classes = [IoT_PanelRenderer]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user_id, roles = _user(request)
+        if IOT_ADMIN not in roles:
+            return _forbidden("You are not authorized to clear the server log.")
+        try:
+            cursor = app_logs.truncate()
+        except app_logs.LogsUnavailable as e:
+            return Response({"cleared": False, "error": str(e)}, status=status.HTTP_200_OK)
+        except OSError as e:
+            return Response(
+                {"cleared": False, "error": f"Cannot clear the server log: {e}"},
+                status=status.HTTP_200_OK,
+            )
+
+        # First line of the new file: an audit trail for a destructive action.
+        logging.getLogger("IoT_Panel").warning("Server log cleared by user_id=%s", user_id)
+        return Response({"cleared": True, "cursor": cursor}, status=status.HTTP_200_OK)

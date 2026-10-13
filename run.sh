@@ -82,13 +82,30 @@ fi
 echo "Ctrl+C to stop. Add new hosts to CORS_ALLOWED_ORIGINS in atd/settings.py."
 echo ""
 
+# Most diagnostics in this project are print() calls, which go to stdout and
+# never reach a logging handler. Tee them into the same file settings.APP_LOG_FILE
+# names, so the IoT Admin live log viewer (api/app-logs/) sees everything that
+# shows up here in the terminal. Output still appears on the console.
+LOG_FILE="$APP/logs/atd.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+# Tells settings.py that stdout is already being written to the log file, so it
+# does not also attach a file handler and write every line twice.
+export ATD_LOG_VIA_STDOUT=1
+echo "  Server log:    $LOG_FILE"
+echo ""
+
 if [ "$RELOAD" -eq 1 ]; then
     # `daphne` is first in INSTALLED_APPS, so it replaces Django's runserver with
     # its own ASGI one: WebSockets are served exactly as under bare daphne, and
     # the autoreloader comes along for free. It is a development server -- the
     # Dockerfile still launches daphne directly.
-    exec "$VENV/bin/python" manage.py runserver "0.0.0.0:$PORT"
+    #
+    # PYTHONUNBUFFERED keeps print() from sitting in a pipe buffer, which would
+    # make the live viewer lag behind by thousands of characters.
+    PYTHONUNBUFFERED=1 "$VENV/bin/python" manage.py runserver "0.0.0.0:$PORT" 2>&1 | tee -a "$LOG_FILE"
+    exit "${PIPESTATUS[0]}"
 fi
 
 # Daphne, not Django's WSGI runserver: this app serves WebSockets and needs ASGI.
-exec "$VENV/bin/daphne" -b 0.0.0.0 -p "$PORT" atd.asgi:application
+PYTHONUNBUFFERED=1 "$VENV/bin/daphne" -b 0.0.0.0 -p "$PORT" atd.asgi:application 2>&1 | tee -a "$LOG_FILE"
+exit "${PIPESTATUS[0]}"
