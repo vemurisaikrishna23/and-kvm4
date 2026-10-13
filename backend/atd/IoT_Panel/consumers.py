@@ -1835,18 +1835,34 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         try:
             dispenser = DispenserUnits.objects.get(imei_number=imei)
         except DispenserUnits.DoesNotExist:
-            print(f"[ERROR] Dispenser with IMEI {imei} not found for OBD/GPS save")
+            ws_log.warning("OBD-GPS imei=%s dispenser not found", imei)
             return
 
-        vehicle_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
-            dispenser_unit=dispenser
-        ).first()
+        # Attach the reading to the mapping that is currently assigned, the way
+        # update_fuel_readings does. A bare .first() with no assigned_status and
+        # no ordering picked an arbitrary row -- in practice the lowest id -- so
+        # every reading landed on a long-unassigned mapping while
+        # /api/vehicle-sensor-data/get/<assigned id>/ returned empty.
+        vehicle_mapping = (
+            Dispenser_Gun_Mapping_To_Vehicles.objects.filter(
+                dispenser_unit=dispenser, assigned_status=True
+            )
+            .order_by("-id")
+            .first()
+            # No assigned mapping: keep the reading rather than dropping it, on
+            # the newest mapping so the choice is at least deterministic.
+            or Dispenser_Gun_Mapping_To_Vehicles.objects.filter(dispenser_unit=dispenser)
+            .order_by("-id")
+            .first()
+        )
         if not vehicle_mapping:
-            print(f"[SKIP OBD-GPS] No vehicle mapping for IMEI {imei}")
+            ws_log.warning("OBD-GPS imei=%s no vehicle mapping, reading dropped", imei)
             return
 
         if not obd_valid and not has_fix:
-            print(f"[SKIP OBD-GPS] IMEI={imei} OBD invalid and no GPS fix — nothing to save")
+            ws_log.info(
+                _ws_line("OBD-GPS", imei, "no OBD and no GPS fix · nothing to save")
+            )
             return
 
         live_odometer = None
@@ -1855,7 +1871,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         if obd_valid and dist_dtc is not None:
             odometer_reading = vehicle_mapping.odometer_reading or 0
             if dist_dtc < 0:
-                print(f"[SKIP OBD-GPS] IMEI={imei} dist_dtc is negative ({dist_dtc}), skipping odometer update")
+                ws_log.warning(
+                    _ws_line("OBD-GPS", imei, f"dist_dtc {dist_dtc} is negative · odometer not updated")
+                )
             else:
                 live_odometer = odometer_reading + dist_dtc
                 vehicle_mapping.live_odometer_reading = live_odometer
