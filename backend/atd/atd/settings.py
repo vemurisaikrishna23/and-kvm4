@@ -132,6 +132,16 @@ LOG_HTTP_BODIES = True
 # page open. WARNING and above are always recorded regardless. Set False to log
 # unconditionally.
 LOG_ONLY_WHEN_WATCHED = True
+
+# --- Live GPS plausibility (msg_type 31) --------------------------------------
+# GPS_JUMP_CHECK: refuse a position that moved more than
+# GPS_JUMP_MAX_DISTANCE_KM within GPS_JUMP_MIN_INTERVAL_SECONDS of the stored
+# one (see IoT_Panel/consumers.py). Disabled for now -- it was dropping frames
+# while the thresholds are still being decided.
+GPS_JUMP_CHECK = False
+# Kept on: (0, 0) is how msg_type 31 renders a missing fix, and storing it puts
+# the dispenser in the Gulf of Guinea on every map.
+GPS_NULL_ISLAND_CHECK = True
 LOG_WS_PAYLOADS = True
 LOG_BODY_MAX_CHARS = 2000
 

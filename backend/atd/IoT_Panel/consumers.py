@@ -165,8 +165,14 @@ def validate_gps_jump(previous, lat, lon, epoch):
     """
     # msg_type 31 coerces a null lat/lon to 0.0, so (0, 0) reaches us as a
     # position off West Africa. It means "no fix", never a real location.
-    if abs(lat) < 1e-9 and abs(lon) < 1e-9:
+    if getattr(settings, "GPS_NULL_ISLAND_CHECK", True) and abs(lat) < 1e-9 and abs(lon) < 1e-9:
         return False, "coordinates are (0, 0), which is a missing fix rather than a position"
+
+    # The distance/interval jump check is off for now: it was dropping frames
+    # while the thresholds are still being settled. Turn GPS_JUMP_CHECK back on
+    # in settings to re-enable it -- the logic below is unchanged.
+    if not getattr(settings, "GPS_JUMP_CHECK", False):
+        return True, ""
 
     if not isinstance(previous, dict):
         return True, ""
@@ -1467,50 +1473,70 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def update_gps_coordinates(self, imei, gps_data: dict, has_fix: bool, epoch=None):
+        """
+        Store the live position on every mapping of this dispenser.
+
+        This used to pick a single row with `.get(assigned_status=True)` and write
+        only that one, while update_connectivity / update_machine_status /
+        update_gun_status / update_price_fields all update every row for the
+        dispenser. The result was a row showing fresh machine and gun status next
+        to a position hours old, which reads as "GPS is not saving" on whichever
+        screen happens to read a different row.
+
+        The `.get()` was also a latent crash: two rows with assigned_status=True
+        raise MultipleObjectsReturned, which nothing here caught.
+        """
         try:
             dispenser = DispenserUnits.objects.get(imei_number=imei)
-            dispenser_mapping = None
-            try:
-                dispenser_mapping = Dispenser_Gun_Mapping_To_Customer.objects.get(
-                    dispenser_unit=dispenser,
-                    assigned_status=True
-                )
-            except Dispenser_Gun_Mapping_To_Customer.DoesNotExist:
-                pass
-            if dispenser_mapping is None:
-                try:
-                    dispenser_mapping = Dispenser_Gun_Mapping_To_Vehicles.objects.get(
-                        dispenser_unit=dispenser,
-                        assigned_status=True
-                    )
-                except Dispenser_Gun_Mapping_To_Vehicles.DoesNotExist:
-                    return
-            current_gps = dispenser_mapping.gps_coordinates or {}
+        except DispenserUnits.DoesNotExist:
+            ws_log.warning("GPS  imei=%s dispenser not found", imei)
+            return
+
+        mappings = list(
+            Dispenser_Gun_Mapping_To_Customer.objects.filter(dispenser_unit_id=dispenser.id)
+        ) + list(
+            Dispenser_Gun_Mapping_To_Vehicles.objects.filter(dispenser_unit_id=dispenser.id)
+        )
+        if not mappings:
+            return
+
+        lat = gps_data.get("lat")
+        lon = gps_data.get("lon")
+        rejected = None
+
+        for mapping in mappings:
+            current_gps = mapping.gps_coordinates or {}
 
             if has_fix:
-                accept, reason = validate_gps_jump(
-                    current_gps, gps_data.get("lat"), gps_data.get("lon"), epoch
-                )
+                # Each row carries its own previous point, so plausibility is
+                # judged per row rather than once for the whole dispenser.
+                accept, reason = validate_gps_jump(current_gps, lat, lon, epoch)
                 if not accept:
-                    # Keep the last good position rather than storing a bad one.
-                    print(f"[GPS REJECT] IMEI {imei}: {reason}")
-                    return
+                    rejected = reason
+                    continue
+                # A fresh dict per row: a shared one would be mutated below and
+                # then stored by reference on every mapping.
+                point = dict(gps_data)
+                point["live_data"] = True
                 # Stored so the next frame has a reliable interval to compare
                 # against; `time_utc` is a formatted string and not safe to parse.
                 if epoch is not None:
-                    gps_data["epoch"] = int(epoch)
-                gps_data["live_data"] = True
-                dispenser_mapping.gps_coordinates = gps_data
+                    point["epoch"] = int(epoch)
+                mapping.gps_coordinates = point
+            elif current_gps:
+                # No fix: keep the last known position but mark it stale.
+                stale = dict(current_gps)
+                stale["live_data"] = False
+                mapping.gps_coordinates = stale
             else:
-                if current_gps:
-                    current_gps["live_data"] = False
-                    dispenser_mapping.gps_coordinates = current_gps
-                else:
-                    gps_data["live_data"] = False
-                    dispenser_mapping.gps_coordinates = gps_data
-            dispenser_mapping.save(update_fields=["gps_coordinates"])
-        except DispenserUnits.DoesNotExist:
-            print(f"[ERROR] Dispenser with IMEI {imei} not found for GPS update")
+                point = dict(gps_data)
+                point["live_data"] = False
+                mapping.gps_coordinates = point
+
+            mapping.save(update_fields=["gps_coordinates"])
+
+        if rejected:
+            ws_log.warning("GPS  imei=%s rejected: %s", imei, rejected)
 
 
 

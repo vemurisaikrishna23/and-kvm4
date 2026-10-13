@@ -5,3 +5,5 @@ INFO 2026-10-12 23:08:40,714 IoT_Panel.http: HTTP GET    200 3369ms  /api/camera
 INFO 2026-10-12 23:08:40,869 IoT_Panel.http: HTTP GET    200 3493ms  /api/camera/get/   user 6789
 INFO 2026-10-12 23:08:52,094 IoT_Panel.http: HTTP GET    200 2599ms  /api/camera/mediamtx/health/   user 6789
 INFO 2026-10-12 23:08:52,195 IoT_Panel.http: HTTP GET    200 2701ms  /api/camera/get/   user 6789
+WARNING 2026-10-13 16:22:12,049 IoT_Panel.ws: GPS  imei=865405076845555 rejected: moved 506.52 km in 30s (limit 10.0 km within 300s)
+WARNING 2026-10-13 16:22:13,774 IoT_Panel.ws: GPS  imei=865405076845555 rejected: coordinates are (0, 0), which is a missing fix rather than a position
