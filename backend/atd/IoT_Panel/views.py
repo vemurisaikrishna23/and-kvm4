@@ -123,6 +123,60 @@ def get_user_roles(user_id):
     )
 
 
+def get_unit_assignments():
+    """
+    Who each dispenser / gun unit is currently assigned to, for the IoT unit lists.
+
+    Returns two dicts, keyed by dispenser_unit_id and gun_unit_id, whose values look like
+    {"type": "customer"|"vehicle", "id", "name", "mapping_id", "dispenser_unit": {"id", "serial_number"}}.
+    Only active mappings (assigned_status=True) count. The mapping tables store the
+    customer / vehicle as a bare id, so names are resolved here in one query each.
+    """
+    customer_mappings = list(
+        Dispenser_Gun_Mapping_To_Customer.objects
+        .filter(assigned_status=True)
+        .values("id", "customer", "dispenser_unit_id", "dispenser_unit__serial_number", "gun_unit_id")
+    )
+    vehicle_mappings = list(
+        Dispenser_Gun_Mapping_To_Vehicles.objects
+        .filter(assigned_status=True)
+        .values("id", "vehicle", "dispenser_unit_id", "dispenser_unit__serial_number", "gun_unit_id")
+    )
+
+    customer_names = dict(
+        Customers.objects
+        .filter(id__in={m["customer"] for m in customer_mappings})
+        .values_list("id", "name")
+    )
+    vehicle_numbers = dict(
+        Vehicles.objects
+        .filter(id__in={m["vehicle"] for m in vehicle_mappings if m["vehicle"] is not None})
+        .values_list("id", "vehicle_no")
+    )
+
+    by_dispenser, by_gun = {}, {}
+    for kind, mappings, key, names in (
+        ("customer", customer_mappings, "customer", customer_names),
+        ("vehicle", vehicle_mappings, "vehicle", vehicle_numbers),
+    ):
+        for m in mappings:
+            target_id = m[key]
+            assignment = {
+                "type": kind,
+                "id": target_id,
+                "name": names.get(target_id) or (f"#{target_id}" if target_id is not None else None),
+                "mapping_id": m["id"],
+                "dispenser_unit": {
+                    "id": m["dispenser_unit_id"],
+                    "serial_number": m["dispenser_unit__serial_number"],
+                },
+            }
+            by_dispenser.setdefault(m["dispenser_unit_id"], assignment)
+            if m["gun_unit_id"] is not None:
+                by_gun.setdefault(m["gun_unit_id"], assignment)
+    return by_dispenser, by_gun
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -241,7 +295,9 @@ class GetDispenserUnits(APIView):
         if "IOT Admin" in roles:
             dispenser_units = DispenserUnits.objects.all()
             serializer = GetDispenserUnitsSerializer(dispenser_units, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            by_dispenser, _ = get_unit_assignments()
+            data = [{**row, "assigned_to": by_dispenser.get(row["id"])} for row in serializer.data]
+            return Response(data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get dispenser units"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -343,7 +399,9 @@ class GetGunUnits(APIView):
         if "IOT Admin" in roles:
             gun_units = GunUnits.objects.all()
             serializer = GetGunUnitsSerializer(gun_units, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            _, by_gun = get_unit_assignments()
+            data = [{**row, "assigned_to": by_gun.get(row["id"])} for row in serializer.data]
+            return Response(data, status=status.HTTP_200_OK)
         else:
             return Response({"error": "You are not authorized to get gun units"}, status=status.HTTP_403_FORBIDDEN)
 

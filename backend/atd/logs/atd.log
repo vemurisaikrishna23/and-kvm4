@@ -7,3 +7,62 @@ INFO 2026-10-12 23:08:52,094 IoT_Panel.http: HTTP GET    200 2599ms  /api/camera
 INFO 2026-10-12 23:08:52,195 IoT_Panel.http: HTTP GET    200 2701ms  /api/camera/get/   user 6789
 WARNING 2026-10-13 16:22:12,049 IoT_Panel.ws: GPS  imei=865405076845555 rejected: moved 506.52 km in 30s (limit 10.0 km within 300s)
 WARNING 2026-10-13 16:22:13,774 IoT_Panel.ws: GPS  imei=865405076845555 rejected: coordinates are (0, 0), which is a missing fix rather than a position
+INFO 2026-10-16 10:29:02,117 django.utils.autoreload: Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+October 16, 2026 - 10:29:03
+Django version 5.2.6, using settings 'atd.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+INFO 2026-10-16 10:29:11,459 django.utils.autoreload: /Users/jaideepmalla/Frontend/ATD/ATD_Backend/and-kvm4/backend/atd/IoT_Panel/views.py changed, reloading.
+INFO 2026-10-16 10:29:12,337 django.utils.autoreload: Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+October 16, 2026 - 10:29:13
+Django version 5.2.6, using settings 'atd.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+INFO 2026-10-16 10:30:10,013 django.utils.autoreload: /Users/jaideepmalla/Frontend/ATD/ATD_Backend/and-kvm4/backend/atd/IoT_Panel/views.py changed, reloading.
+INFO 2026-10-16 10:30:10,962 django.utils.autoreload: Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+October 16, 2026 - 10:30:12
+Django version 5.2.6, using settings 'atd.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+INFO 2026-10-16 10:33:54,667 django.utils.autoreload: /Users/jaideepmalla/Frontend/ATD/ATD_Backend/and-kvm4/backend/atd/IoT_Panel/views.py changed, reloading.
+INFO 2026-10-16 10:33:55,592 django.utils.autoreload: Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+October 16, 2026 - 10:33:56
+Django version 5.2.6, using settings 'atd.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+INFO 2026-10-16 10:36:12,858 django.utils.autoreload: /Users/jaideepmalla/Frontend/ATD/ATD_Backend/and-kvm4/backend/atd/IoT_Panel/camera_serializers.py changed, reloading.
+INFO 2026-10-16 10:36:13,705 django.utils.autoreload: Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+October 16, 2026 - 10:36:14
+Django version 5.2.6, using settings 'atd.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+INFO 2026-10-16 10:36:14,860 django.utils.autoreload: /Users/jaideepmalla/Frontend/ATD/ATD_Backend/and-kvm4/backend/atd/IoT_Panel/camera_views.py changed, reloading.
+INFO 2026-10-16 10:36:15,432 django.utils.autoreload: Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+October 16, 2026 - 10:36:16
+Django version 5.2.6, using settings 'atd.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+INFO 2026-10-16 10:39:00,063 IoT_Panel.http: HTTP GET    200 3364ms  /api/camera/mediamtx/health/   user 6789
+INFO 2026-10-16 10:39:00,082 IoT_Panel.http: HTTP GET    200 3382ms  /api/camera/mediamtx/health/   user 6789
+INFO 2026-10-16 10:39:00,917 IoT_Panel.http: HTTP GET    200 4225ms  /api/camera/get/   user 6789
+INFO 2026-10-16 10:39:00,917 IoT_Panel.http: HTTP GET    200 4225ms  /api/camera/get/   user 6789
+INFO 2026-10-16 10:39:04,262 IoT_Panel.http: HTTP GET    200 1357ms  /api/dispenser-unit/get/   user 6789
+INFO 2026-10-16 10:39:04,343 IoT_Panel.http: HTTP GET    200 1438ms  /api/dispenser-unit/get/   user 6789

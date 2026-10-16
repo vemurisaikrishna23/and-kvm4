@@ -392,6 +392,7 @@ class RTMPDevices(APIView):
                 "camera_id": cam.id if cam else None,
                 "camera_serial_number": cam.serial_number if cam else None,
                 "dispenser_serial_number": cam.dispenser_unit.serial_number if cam else None,
+                "assignment": current_assignment(cam.dispenser_unit_id) if cam else None,
             })
         return Response(data, status=status.HTTP_200_OK)
 

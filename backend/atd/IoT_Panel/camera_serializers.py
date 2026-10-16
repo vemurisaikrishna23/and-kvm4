@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from existing_tables.models import Customers
+from existing_tables.models import Customers, Vehicles
 from .models import (
     Camera,
     CameraEvent,
@@ -31,7 +31,8 @@ def current_assignment(dispenser_unit_id):
         .first()
     )
     if v:
-        return {"type": "vehicle", "mapping_id": v["id"], "vehicle_id": v["vehicle"]}
+        vehicle_no = Vehicles.objects.filter(id=v["vehicle"]).values_list("vehicle_no", flat=True).first()
+        return {"type": "vehicle", "mapping_id": v["id"], "vehicle_id": v["vehicle"], "vehicle_no": vehicle_no}
     return None
 
 
