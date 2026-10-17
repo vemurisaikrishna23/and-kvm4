@@ -509,7 +509,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         try:
                             volume_val = float(volume) / 100
                             money_val = float(money)
-                            price_val = float(ppu_level1)
+                            # Machine reports price in paise (10478 -> 104.78)
+                            price_val = float(ppu_level1) / 100
                         except ValueError:
                             await self.send_error_message("Invalid number format in volume, money, or ppu_level1")
                             return
@@ -569,7 +570,8 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
                         imei=imei,
                         totalizer_reading=gvr_volume / 100.0,
                         amount=gvr_money,
-                        live_price=gvr_ppu_level1
+                        # Machine reports price in paise (10478 -> 104.78)
+                        live_price=gvr_ppu_level1 / 100.0
                     )
 
                     obd_fields_exist = all(field in data for field in ["OBDValid", "dist_dtc", "OBD"])
