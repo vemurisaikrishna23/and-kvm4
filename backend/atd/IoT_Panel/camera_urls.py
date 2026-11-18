@@ -12,6 +12,7 @@ urlpatterns = [
     path("camera/edit/<int:id>/", EditCamera.as_view(), name="edit-camera"),
     path("camera/delete/<int:id>/", DeleteCamera.as_view(), name="delete-camera"),
 
+
     # Control & monitoring
     path("camera/status/<int:id>/", CameraStatus.as_view(), name="camera-status"),
     path("camera/enable/<int:id>/", EnableCamera.as_view(), name="enable-camera"),
@@ -21,6 +22,7 @@ urlpatterns = [
     path("camera/rtmp-devices/", RTMPDevices.as_view(), name="camera-rtmp-devices"),
     path("camera/mediamtx/health/", MediaMTXHealth.as_view(), name="camera-mediamtx-health"),
     path("camera/mediamtx/logs/", MediaMTXLogs.as_view(), name="camera-mediamtx-logs"),
+    
     # Backend log tail for the IoT Admin live viewer
     path("app-logs/", AppLogs.as_view(), name="app-logs"),
     path("app-logs/clear/", ClearAppLogs.as_view(), name="app-logs-clear"),

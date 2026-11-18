@@ -17,6 +17,7 @@ class ExistingUsersProxy(Users):
         return False
 
 
+
 class ExistingUsersJWTAuthentication(JWTAuthentication):
     def get_user(self, validated_token):
         user_id = validated_token.get("user_id")
