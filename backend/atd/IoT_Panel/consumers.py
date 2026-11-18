@@ -416,7 +416,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         ws_log.info(_ws_line("DISCONNECT", getattr(self, "imei_number", None),
                              f"{getattr(self, 'client_type', '-')} · closed {close_code}"))
-        await self.channel_layer.group_discard(self.room_id, self.channel_name)
+        # Local bookkeeping and the DB status go first: if Redis is slow, daphne
+        # kills this handler after 10s and anything after the Redis call is lost,
+        # leaving hardware shown as "online" forever.
         await self.remove_connected_client()
 
         # Only update status if hardware disconnects
@@ -424,6 +426,17 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
             await self.update_connectivity(self.imei_number, "offline")
         if self.client_type == 'web':
             print("web client disconnected")
+
+        # Leaving the group is best effort: the membership expires on its own
+        # (group_expiry), so never let a stalled Redis hold up the shutdown.
+        try:
+            await asyncio.wait_for(
+                self.channel_layer.group_discard(self.room_id, self.channel_name),
+                timeout=3,
+            )
+        except Exception as e:
+            ws_log.warning(_ws_line("REDIS", getattr(self, "imei_number", None),
+                                    f"group_discard failed: {type(e).__name__} {e}"))
 
     async def receive(self, text_data=None, bytes_data=None):
         if text_data is not None:
