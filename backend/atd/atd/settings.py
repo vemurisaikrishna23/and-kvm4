@@ -198,7 +198,13 @@ LOGGING = {
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        # Pooled MySQL backend (django-db-connection-pool / SQLAlchemy QueuePool).
+        # Plain Django has no pool for MySQL, so every request and every
+        # WebSocket DB call opened a brand-new MySQL connection and logged in
+        # again. With the pool, Django's close() hands the connection back to a
+        # process-wide pool instead of disconnecting, so a small fixed set of
+        # connections is reused across all threads.
+        "ENGINE": "dj_db_conn_pool.backends.mysql",
         "NAME": "atd_uat_db",
         "USER": "iotjaideep",
         "PASSWORD": "k8P3x7M1s4",
@@ -218,7 +224,29 @@ DATABASES = {
         #
         # 0 costs a connect per request -- a few ms to RDS in the same region --
         # and in exchange bounds usage to the number of in-flight requests.
+        #
+        # Keep this at 0 with the pool: "close" now means "return to the pool",
+        # so connections are reused without being pinned to a thread.
         "CONN_MAX_AGE": 0,
+        # Long-lived connections: each one is opened once and reused until the
+        # server or network actually drops it.
+        #   POOL_SIZE     at most this many connections per process, opened on
+        #                 demand and then kept. Sized for MySQL
+        #                 max_connections = 60, which is shared with other clients.
+        #   MAX_OVERFLOW  0, so no short-lived burst connections are opened
+        #                 and closed; when all are busy a caller waits up to
+        #                 TIMEOUT seconds for one to come back.
+        #   RECYCLE       -1, so connections are never retired for their age.
+        #   PRE_PING      checks a connection before each use and replaces it
+        #                 only if it is dead (MySQL wait_timeout, RDS failover,
+        #                 network drop), so a stale one never reaches a query.
+        "POOL_OPTIONS": {
+            "POOL_SIZE": int(os.environ.get("DB_POOL_SIZE", "10")),
+            "MAX_OVERFLOW": int(os.environ.get("DB_POOL_MAX_OVERFLOW", "0")),
+            "TIMEOUT": int(os.environ.get("DB_POOL_TIMEOUT", "15")),
+            "RECYCLE": int(os.environ.get("DB_POOL_RECYCLE", "-1")),
+            "PRE_PING": True,
+        },
             "OPTIONS": {
             "charset": "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",

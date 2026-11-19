@@ -1819,7 +1819,9 @@ class DispenserControlConsumer(AsyncWebsocketConsumer):
         camera_service.on_fuel_request_status(transaction_id, request_status)
         return {"success": True,"request_status": request_status}
 
-    @sync_to_async
+    # database_sync_to_async (not plain sync_to_async) so the DB connection is
+    # released back to the pool when the call finishes.
+    @database_sync_to_async
     def mark_vin_vehicle_status_true(self,txn_id: str):
         try:
             row =VIN_Vehicle.objects.get(transaction_id=txn_id)
