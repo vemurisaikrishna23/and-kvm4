@@ -518,17 +518,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            # Extra keys are passed to redis-py's ConnectionPool. Without timeouts a
-            # stalled Redis socket blocks a consumer forever, and daphne then logs
-            # "took too long to shut down and was killed" on every disconnect.
-            # socket_timeout must stay above channels_redis' 5s BZPOPMIN wait.
-            "hosts": [{
-                "address": "redis://:Myaccess2021@178.16.137.196:6379/0",
-                "socket_connect_timeout": 5,
-                "socket_timeout": 8,
-                "socket_keepalive": True,
-                "health_check_interval": 30,
-            }],
+            "hosts": ["redis://:Myaccess2021@178.16.137.196:6379/0"],
         },
     },
 }
