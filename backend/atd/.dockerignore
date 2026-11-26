@@ -1,0 +1,3 @@
+# Keep secrets out of the image; production passes them with --env-file.
+.env
+.venv

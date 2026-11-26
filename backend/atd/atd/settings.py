@@ -14,8 +14,14 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load backend/atd/.env for local development. Variables already set in the
+# environment (e.g. by `docker run --env-file` in production) take precedence.
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -205,12 +211,12 @@ DATABASES = {
         # process-wide pool instead of disconnecting, so a small fixed set of
         # connections is reused across all threads.
         "ENGINE": "dj_db_conn_pool.backends.mysql",
-        "NAME": "atd_uat_db",
-        "USER": "iotjaideep",
-        "PASSWORD": "k8P3x7M1s4",
-        "HOST": "Atd-iot-db.coh7dtk0kjb8.ap-south-1.rds.amazonaws.com",
-        # "HOST": "65.1.231.95",
-        "PORT": "3306",
+        # Credentials come from the environment / .env (see .env.example).
+        "NAME": os.environ.get("DB_NAME", ""),
+        "USER": os.environ.get("DB_USER", ""),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+        "HOST": os.environ.get("DB_HOST", ""),
+        "PORT": os.environ.get("DB_PORT", "3306"),
         # Close each connection when its request/consumer call finishes.
         #
         # This server runs under ASGI, where Django's thread-local connections

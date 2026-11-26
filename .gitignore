@@ -5,3 +5,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 backend/atd/logs/atd.log
+
+# Environment secrets
+.env
